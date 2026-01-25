@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  jobs:
+    golangci-lint:
+      run: golangci-lint run ./...
+
+    go-mod-tidy:
+      run: go mod tidy
+      stage_fixed: true
+
+    format:
+      glob: "*.{go,nix}"
+      run: treefmt --fail-on-change {staged_files}
+      stage_fixed: true
