@@ -1,7 +1,14 @@
 package main
 
-import "fmt"
+import (
+	"os"
+
+	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/cli"
+)
 
 func main() {
-	fmt.Println("Hello")
+	err := cli.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
 }

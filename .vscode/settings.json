@@ -3,7 +3,7 @@
   "explorer.fileNesting.patterns": {
     "*.nix": "${capture}.test.nix",
     "flake.nix": "flake.lock",
-    "*go": "${capture}_test.go",
+    "*.go": "${capture}_test.go",
     "go.mod": "go.sum"
   },
   "go.lintTool": "golangci-lint-v2",
