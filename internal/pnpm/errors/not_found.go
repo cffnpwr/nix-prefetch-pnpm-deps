@@ -1,19 +1,23 @@
 package pnpm_err
 
-import "fmt"
+import (
+	"fmt"
 
-type PnpmNotFoundError struct{ baseError }
+	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/common"
+)
+
+type PnpmNotFoundError struct{ common.BaseError }
 
 var _ PnpmErrorIF = (*PnpmNotFoundError)(nil)
 
 func (e *PnpmNotFoundError) Error() string {
 	errMsg := "pnpm not found"
-	if e.message != "" {
-		errMsg = fmt.Sprintf("%s: %s", errMsg, e.message)
+	if e.Message != "" {
+		errMsg = fmt.Sprintf("%s: %s", errMsg, e.Message)
 	}
 
-	if e.cause != nil {
-		errMsg = fmt.Sprintf("%s\ncaused by: %s", errMsg, e.cause.Error())
+	if e.Cause != nil {
+		errMsg = fmt.Sprintf("%s\ncaused by: %s", errMsg, e.Cause.Error())
 	}
 	return errMsg
 }

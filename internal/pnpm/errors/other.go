@@ -1,20 +1,24 @@
 package pnpm_err
 
-import "fmt"
+import (
+	"fmt"
 
-type OtherError struct{ baseError }
+	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/common"
+)
+
+type OtherError struct{ common.BaseError }
 
 var _ PnpmErrorIF = (*OtherError)(nil)
 
 func (e *OtherError) Error() string {
 	errMsg := "an unspecified error occurred"
 
-	if e.message != "" {
-		errMsg = e.message
+	if e.Message != "" {
+		errMsg = e.Message
 	}
 
-	if e.cause != nil {
-		errMsg = fmt.Sprintf("%s\ncaused by: %s", errMsg, e.cause.Error())
+	if e.Cause != nil {
+		errMsg = fmt.Sprintf("%s\ncaused by: %s", errMsg, e.Cause.Error())
 	}
 	return errMsg
 }

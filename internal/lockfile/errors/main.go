@@ -1,6 +1,6 @@
-package pnpm_err
+package lockfile_err
 
-type PnpmErrorIF interface {
+type LockfileErrorIF interface {
 	error
 	Unwrap() error
 	Is(target error) bool
@@ -10,7 +10,7 @@ type PnpmErrorIF interface {
 	SetCause(error)
 }
 
-func NewPnpmError(e PnpmErrorIF, message string, cause error) PnpmErrorIF {
+func NewLockfileError(e LockfileErrorIF, message string, cause error) LockfileErrorIF {
 	e.SetMessage(message)
 	e.SetCause(cause)
 	return e

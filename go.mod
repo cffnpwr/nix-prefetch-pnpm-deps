@@ -25,4 +25,5 @@ require (
 	github.com/go-extras/cobraflags v0.0.0-20260116100222-f76efc9500d4
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	go.yaml.in/yaml/v4 v4.0.0-rc.4
 )
