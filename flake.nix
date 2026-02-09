@@ -34,7 +34,9 @@
               nil
               nixd
               nixfmt
+              pkg-config
               treefmt
+              zstd
             ];
 
             shellHook = ''

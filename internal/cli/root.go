@@ -44,6 +44,7 @@ func initPnpm(osFs afero.Fs, pnpmPath string) (*pnpm.Pnpm, error) {
 }
 
 func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (string, error) {
+	// Step 1: Normalize the pnpm store (remove tmp/projects, normalize JSON, set permissions)
 	if normalizeErr := store.Normalize(osFs, store.NormalizeOptions{
 		StorePath:      storePath,
 		FetcherVersion: fetcherVersion,
@@ -51,7 +52,62 @@ func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (stri
 		return "", normalizeErr
 	}
 
+	//nolint:mnd // fetcherVersion 3+ uses tarball-based output
+	if fetcherVersion >= 3 {
+		// For fetcherVersion 3+: create output directory with .fetcher-version file and tarball
+		return computeHashWithTarball(osFs, storePath, fetcherVersion)
+	}
+
+	// For fetcherVersion < 3: hash the store directory directly
+	//nolint:mnd // fetcherVersion 2+ includes .fetcher-version file
+	if fetcherVersion >= 2 {
+		// Write .fetcher-version file to the store directory
+		fetcherVersionPath := filepath.Join(storePath, ".fetcher-version")
+		versionContent := fmt.Sprintf("%d\n", fetcherVersion)
+		writeErr := afero.WriteFile(osFs, fetcherVersionPath, []byte(versionContent), 0o444)
+		if writeErr != nil {
+			return "", fmt.Errorf("failed to write .fetcher-version: %w", writeErr)
+		}
+	}
+
 	hash, hashErr := store.Hash(osFs, storePath)
+	if hashErr != nil {
+		return "", hashErr
+	}
+
+	return hash, nil
+}
+
+func computeHashWithTarball(osFs afero.Fs, storePath string, fetcherVersion int) (string, error) {
+	// Create temporary output directory for .fetcher-version and tarball
+	outDir, err := os.MkdirTemp("", "nix-prefetch-pnpm-out-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create output directory: %w", err)
+	}
+	defer os.RemoveAll(outDir)
+
+	// Write .fetcher-version file
+	fetcherVersionPath := filepath.Join(outDir, ".fetcher-version")
+	versionContent := fmt.Sprintf("%d\n", fetcherVersion)
+	//nolint:mnd // read-only file permissions
+	writeErr := afero.WriteFile(
+		osFs,
+		fetcherVersionPath,
+		[]byte(versionContent),
+		0o444,
+	)
+	if writeErr != nil {
+		return "", fmt.Errorf("failed to write .fetcher-version: %w", writeErr)
+	}
+
+	// Create reproducible tarball
+	tarballPath := filepath.Join(outDir, "pnpm-store.tar.zst")
+	if tarballErr := store.CreateTarball(osFs, storePath, tarballPath); tarballErr != nil {
+		return "", tarballErr
+	}
+
+	// Hash the output directory (containing .fetcher-version and tarball)
+	hash, hashErr := store.Hash(osFs, outDir)
 	if hashErr != nil {
 		return "", hashErr
 	}
