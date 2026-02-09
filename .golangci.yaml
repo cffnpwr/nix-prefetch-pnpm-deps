@@ -95,6 +95,8 @@ linters:
   settings:
     govet:
       enable-all: true
+      disable:
+        - fieldalignment # micro-optimization that hurts readability with negligible performance impact for CLI tools
       settings:
         shadow:
           strict: true
@@ -120,6 +122,18 @@ linters:
       - text: 'comment on exported \S+ \S+ should be of the form ".+"'
         source: '// ?(nolint|TODO)'
         linters: [ revive, staticcheck ]
+      # gosec G204 / noctx: expected behavior for CLI tools that intentionally run external commands
+      - text: 'G204'
+        path: 'internal/pnpm/'
+        linters: [ gosec ]
+      - path: 'internal/pnpm/'
+        linters: [ noctx ]
+      # revive var-naming: intentional underscore convention for error sub-packages
+      - text: "don't use an underscore in package name"
+        linters: [ revive ]
+      # revive var-naming: common package serves its purpose as shared utilities
+      - text: 'avoid meaningless package names'
+        linters: [ revive ]
       - path: '_test\.go'
         linters:
           - bodyclose

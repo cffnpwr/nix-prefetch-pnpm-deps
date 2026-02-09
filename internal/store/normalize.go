@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ func Normalize(afs afero.Fs, opts NormalizeOptions) store_err.StoreErrorIF {
 	}
 
 	// Step 2: Normalize JSON files
-	if err := normalizeJsonFiles(afs, opts.StorePath); err != nil {
+	if err := normalizeJSONFiles(afs, opts.StorePath); err != nil {
 		return err
 	}
 
@@ -50,6 +51,7 @@ func Normalize(afs afero.Fs, opts NormalizeOptions) store_err.StoreErrorIF {
 	}
 
 	// Step 4: Set permissions (fetcherVersion >= 2 only)
+	//nolint:mnd // fetcherVersion 2+ requires permission normalization
 	if opts.FetcherVersion >= 2 {
 		if err := setPermissions(afs, opts.StorePath); err != nil {
 			return err
@@ -59,48 +61,61 @@ func Normalize(afs afero.Fs, opts NormalizeOptions) store_err.StoreErrorIF {
 	return nil
 }
 
-// normalizeJsonFiles walks storePath, finds all .json files, and normalizes each one.
+// normalizeJSONFiles walks storePath, finds all .json files, and normalizes each one.
 // Stops and returns the error on the first failure.
-func normalizeJsonFiles(afs afero.Fs, storePath string) store_err.StoreErrorIF {
-	var normalizeErr store_err.StoreErrorIF
+func normalizeJSONFiles(afs afero.Fs, storePath string) store_err.StoreErrorIF {
+	normalizeErr := afero.Walk(
+		afs,
+		storePath,
+		func(path string, info fs.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return store_err.NewStoreError(
+					&store_err.FailedToNormalizeJSONError{},
+					"",
+					walkErr,
+				)
+			}
 
-	_ = afero.Walk(afs, storePath, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			normalizeErr = store_err.NewStoreError(
-				&store_err.FailedToNormalizeJsonError{},
-				"",
-				err,
-			)
-			return err
-		}
+			if info.IsDir() || !strings.HasSuffix(path, ".json") {
+				return nil
+			}
 
-		if info.IsDir() || !strings.HasSuffix(path, ".json") {
+			if e := normalizeJSONFile(afs, path, info.Mode()); e != nil {
+				return e
+			}
+
 			return nil
+		},
+	)
+
+	if normalizeErr != nil {
+		var storeErr store_err.StoreErrorIF
+		if errors.As(normalizeErr, &storeErr) {
+			return storeErr
 		}
 
-		if e := normalizeJsonFile(afs, path, info.Mode()); e != nil {
-			normalizeErr = e
-			return e
-		}
+		return store_err.NewStoreError(
+			&store_err.FailedToNormalizeJSONError{},
+			"",
+			normalizeErr,
+		)
+	}
 
-		return nil
-	})
-
-	return normalizeErr
+	return nil
 }
 
-// normalizeJsonFile normalizes a single JSON file for reproducible Nix hash computation.
+// normalizeJSONFile normalizes a single JSON file for reproducible Nix hash computation.
 // pnpm writes JSON with non-deterministic key order and includes "checkedAt" timestamps
 // that change on every install. This function removes all "checkedAt" keys and writes
 // the file back with sorted keys so the same pnpm-lock.yaml always produces the same hash.
 // UseNumber preserves original number formatting, and SetEscapeHTML(false) matches jq output.
-func normalizeJsonFile(afs afero.Fs, path string, mode fs.FileMode) store_err.StoreErrorIF {
-	data, err := afero.ReadFile(afs, path)
-	if err != nil {
+func normalizeJSONFile(afs afero.Fs, path string, mode fs.FileMode) store_err.StoreErrorIF {
+	data, readErr := afero.ReadFile(afs, path)
+	if readErr != nil {
 		return store_err.NewStoreError(
-			&store_err.FailedToNormalizeJsonError{},
+			&store_err.FailedToNormalizeJSONError{},
 			path,
-			err,
+			readErr,
 		)
 	}
 
@@ -109,11 +124,11 @@ func normalizeJsonFile(afs afero.Fs, path string, mode fs.FileMode) store_err.St
 	dec.UseNumber()
 
 	var v any
-	if err := dec.Decode(&v); err != nil {
+	if decodeErr := dec.Decode(&v); decodeErr != nil {
 		return store_err.NewStoreError(
-			&store_err.FailedToNormalizeJsonError{},
+			&store_err.FailedToNormalizeJSONError{},
 			path,
-			err,
+			decodeErr,
 		)
 	}
 
@@ -126,19 +141,19 @@ func normalizeJsonFile(afs afero.Fs, path string, mode fs.FileMode) store_err.St
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
 
-	if err := enc.Encode(v); err != nil {
+	if encodeErr := enc.Encode(v); encodeErr != nil {
 		return store_err.NewStoreError(
-			&store_err.FailedToNormalizeJsonError{},
+			&store_err.FailedToNormalizeJSONError{},
 			path,
-			err,
+			encodeErr,
 		)
 	}
 
-	if err := afero.WriteFile(afs, path, buf.Bytes(), mode); err != nil {
+	if writeErr := afero.WriteFile(afs, path, buf.Bytes(), mode); writeErr != nil {
 		return store_err.NewStoreError(
-			&store_err.FailedToNormalizeJsonError{},
+			&store_err.FailedToNormalizeJSONError{},
 			path,
-			err,
+			writeErr,
 		)
 	}
 
@@ -175,7 +190,7 @@ func removeCheckedAt(v any) any {
 //   - files named *-exec: 0555 (r-xr-xr-x)
 //   - other files:        0444 (r--r--r--)
 func setPermissions(afs afero.Fs, storePath string) store_err.StoreErrorIF {
-	err := afero.Walk(afs, storePath, func(path string, info fs.FileInfo, err error) error {
+	walkErr := afero.Walk(afs, storePath, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return store_err.NewStoreError(
 				&store_err.FailedToSetPermissionsError{},
@@ -185,27 +200,37 @@ func setPermissions(afs afero.Fs, storePath string) store_err.StoreErrorIF {
 		}
 
 		var mode fs.FileMode
-		if info.IsDir() {
+		switch {
+		case info.IsDir():
 			mode = 0o555
-		} else if strings.HasSuffix(info.Name(), "-exec") {
+		case strings.HasSuffix(info.Name(), "-exec"):
 			mode = 0o555
-		} else {
+		default:
 			mode = 0o444
 		}
 
-		if err := afs.Chmod(path, mode); err != nil {
+		if chmodErr := afs.Chmod(path, mode); chmodErr != nil {
 			return store_err.NewStoreError(
 				&store_err.FailedToSetPermissionsError{},
 				path,
-				err,
+				chmodErr,
 			)
 		}
 
 		return nil
 	})
 
-	if err != nil {
-		return err.(store_err.StoreErrorIF)
+	if walkErr != nil {
+		var storeErr store_err.StoreErrorIF
+		if errors.As(walkErr, &storeErr) {
+			return storeErr
+		}
+
+		return store_err.NewStoreError(
+			&store_err.FailedToSetPermissionsError{},
+			"",
+			walkErr,
+		)
 	}
 
 	return nil

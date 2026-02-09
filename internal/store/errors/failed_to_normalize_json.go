@@ -2,11 +2,11 @@ package store_err
 
 import "github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/common"
 
-type FailedToNormalizeJsonError struct{ common.BaseError }
+type FailedToNormalizeJSONError struct{ common.BaseError }
 
-var _ StoreErrorIF = (*FailedToNormalizeJsonError)(nil)
+var _ StoreErrorIF = (*FailedToNormalizeJSONError)(nil)
 
-func (e *FailedToNormalizeJsonError) Error() string {
+func (e *FailedToNormalizeJSONError) Error() string {
 	errMsg := "failed to normalize json"
 
 	if e.Message != "" {
@@ -19,13 +19,13 @@ func (e *FailedToNormalizeJsonError) Error() string {
 	return errMsg
 }
 
-func (e *FailedToNormalizeJsonError) Is(target error) bool {
-	_, ok := target.(*FailedToNormalizeJsonError)
+func (e *FailedToNormalizeJSONError) Is(target error) bool {
+	_, ok := target.(*FailedToNormalizeJSONError)
 	return ok
 }
 
-func (e *FailedToNormalizeJsonError) As(target any) bool {
-	if t, ok := target.(**FailedToNormalizeJsonError); ok {
+func (e *FailedToNormalizeJSONError) As(target any) bool {
+	if t, ok := target.(**FailedToNormalizeJSONError); ok {
 		*t = e
 		return true
 	}

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,7 +10,7 @@ import (
 func MajorVersion(v string) (int, error) {
 	parts := strings.Split(v, ".")
 	if len(parts) == 0 {
-		return 0, fmt.Errorf("invalid version format")
+		return 0, errors.New("invalid version format")
 	}
 
 	major, err := strconv.Atoi(parts[0])

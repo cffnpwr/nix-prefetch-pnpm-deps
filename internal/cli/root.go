@@ -6,7 +6,7 @@ var rootCmd = &cobra.Command{
 	Use:   "nix-prefetch-pnpm-deps",
 	Short: "prefetch dependencies for pnpm",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return nil
 	},
 }

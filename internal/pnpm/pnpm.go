@@ -1,7 +1,6 @@
 package pnpm
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/caarlos0/env/v11"
@@ -69,7 +68,7 @@ func validatePnpmExecutable(fs afero.Fs, path string) pnpm_err.PnpmErrorIF {
 	if err != nil {
 		return pnpm_err.NewPnpmError(
 			&pnpm_err.PnpmNotFoundError{},
-			fmt.Sprintf("pnpm executable not found at path: %s", path),
+			"pnpm executable not found at path: "+path,
 			err,
 		)
 	}
@@ -77,7 +76,7 @@ func validatePnpmExecutable(fs afero.Fs, path string) pnpm_err.PnpmErrorIF {
 	if !f.Mode().IsRegular() || (f.Mode().Perm()&0111 == 0) {
 		return pnpm_err.NewPnpmError(
 			&pnpm_err.PnpmNotFoundError{},
-			fmt.Sprintf("pnpm executable is not a executable file at path: %s", path),
+			"pnpm executable is not a executable file at path: "+path,
 			nil,
 		)
 	}

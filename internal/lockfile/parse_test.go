@@ -78,10 +78,8 @@ func Test_Load(t *testing.T) {
 			want: &lockfile.Lockfile{LockfileVersion: "9.0"},
 		},
 		{
-			name: "[異常系] ファイルが存在しない",
-			setupFs: func() afero.Fs {
-				return afero.NewMemMapFs()
-			},
+			name:    "[異常系] ファイルが存在しない",
+			setupFs: afero.NewMemMapFs,
 			path:    "/pnpm-lock.yaml",
 			wantErr: &lockfile_err.LockfileNotFoundError{},
 		},

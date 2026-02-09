@@ -31,18 +31,14 @@ func Test_New(t *testing.T) {
 			wantPath: "/path/to/pnpm/bin/pnpm",
 		},
 		{
-			name: "[異常系] 空のパス文字列",
-			setupFs: func() afero.Fs {
-				return afero.NewMemMapFs()
-			},
+			name:    "[異常系] 空のパス文字列",
+			setupFs: afero.NewMemMapFs,
 			path:    "",
 			wantErr: &pnpm_err.PnpmNotFoundError{},
 		},
 		{
-			name: "[異常系] pnpmの実行ファイルが存在しないパス文字列",
-			setupFs: func() afero.Fs {
-				return afero.NewMemMapFs()
-			},
+			name:    "[異常系] pnpmの実行ファイルが存在しないパス文字列",
+			setupFs: afero.NewMemMapFs,
 			path:    "/invalid/path/to/pnpm/bin/pnpm",
 			wantErr: &pnpm_err.PnpmNotFoundError{},
 		},
@@ -95,18 +91,14 @@ func Test_WithPathEnvVar(t *testing.T) {
 			wantPath:   "/path/to/pnpm/bin/pnpm",
 		},
 		{
-			name: "[異常系] PATHにpnpmが含まれていない場合",
-			setupFs: func() afero.Fs {
-				return afero.NewMemMapFs()
-			},
+			name:       "[異常系] PATHにpnpmが含まれていない場合",
+			setupFs:    afero.NewMemMapFs,
 			pathEnvVar: "/some/other/path",
 			wantErr:    &pnpm_err.PnpmNotFoundError{},
 		},
 		{
-			name: "[異常系] PATHが空の場合",
-			setupFs: func() afero.Fs {
-				return afero.NewMemMapFs()
-			},
+			name:       "[異常系] PATHが空の場合",
+			setupFs:    afero.NewMemMapFs,
 			pathEnvVar: "",
 			wantErr:    &pnpm_err.PnpmNotFoundError{},
 		},
