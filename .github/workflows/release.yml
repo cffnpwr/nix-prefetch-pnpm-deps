@@ -32,7 +32,10 @@ jobs:
         uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
 
       - name: Build binaries
-        run: nix build .#static --system ${{ matrix.nix-system }} --out-link dist/nix-prefetch-pnpm-deps_${{ matrix.nix-system }} nix-prefetch-pnpm-deps
+        run: |
+          nix build .#static --system ${{ matrix.nix-system }}
+          mkdir -p dist
+          cp result/bin/nix-prefetch-pnpm-deps dist/
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
@@ -45,8 +48,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -60,24 +61,22 @@ jobs:
           private-key: ${{ secrets.RELEASE_PRIVATE_KEY }}
           permission-contents: write
 
-      - name: Create release archives and publish
+      - name: Create release archives and upload
         run: |
           VERSION=${GITHUB_REF_NAME#v}
 
-          # Find all binaries and create archives
-          for binary in $(find dist-* -type f -name 'nix-prefetch-pnpm-deps'); do
-            # Extract os and arch from the path
-            dir=$(dirname "$binary")
+          # Create archives from each platform's binary
+          for artifact_dir in dist-*; do
+            system=${artifact_dir#dist-}
+            binary="$artifact_dir/nix-prefetch-pnpm-deps"
 
-            # Built binary path looks like dist-x86_64-linux/nix-prefetch-pnpm-deps
-            folder_name=$(basename "$dir")
-            platform=$(echo "$folder_name" | sed 's/nix-prefetch-pnpm-deps_//')
-            os=$(echo "$platform" | cut -d'_' -f1)
-            arch=$(echo "$platform" | cut -d'_' -f2)
+            if [ ! -f "$binary" ]; then
+              echo "Warning: binary not found in $artifact_dir"
+              continue
+            fi
 
-            archive_name="nix-prefetch-pnpm-deps_${VERSION}_${os}_${arch}.tar.gz"
+            archive_name="nix-prefetch-pnpm-deps_${VERSION}_${system}.tar.gz"
 
-            # Create a temporary directory for the archive contents
             tmpdir=$(mktemp -d)
             cp "$binary" "$tmpdir/"
             cp LICENSE README.md "$tmpdir/" 2>/dev/null || true
@@ -88,13 +87,8 @@ jobs:
           # Generate checksums
           sha256sum *.tar.gz > checksums.txt
 
-          # Generate changelog
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
-          git log ${PREV_TAG}..HEAD --pretty=format:"* %s (%h)" > changelog.md
-
-          # Create release
-          gh release create $GITHUB_REF_NAME *.tar.gz checksums.txt \
-            --title "$GITHUB_REF_NAME" \
-            --notes-file changelog.md
+          # Upload assets to the existing draft release and publish it
+          gh release upload "$GITHUB_REF_NAME" *.tar.gz checksums.txt
+          gh release edit "$GITHUB_REF_NAME" --draft=false
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
