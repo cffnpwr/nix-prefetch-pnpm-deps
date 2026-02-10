@@ -8,46 +8,53 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        runner:
-          - ubuntu-24.04
-          - ubuntu-24.04-arm
-          - macos-15
-          - macos-15-intel
+        include:
+          - runner: ubuntu-24.04
+            nix-system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            nix-system: aarch64-linux
+          - runner: macos-15
+            nix-system: aarch64-darwin
+          - runner: macos-15
+            nix-system: x86_64-darwin
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install libzstd (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libzstd-dev pkg-config
+      - name: Setup Nix
+        uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
 
-      - name: Install libzstd (macOS)
-        if: runner.os == 'macOS'
-        run: brew install zstd pkg-config
+      - name: Build binaries
+        run: nix build .#static --system ${{ matrix.nix-system }} --out-link dist/nix-prefetch-pnpm-deps_${{ matrix.nix-system }} nix-prefetch-pnpm-deps
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          args: build --clean --single-target
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist-${{ runner.os }}-${{ runner.arch }}
+          name: dist-${{ matrix.nix-system }}
           path: dist/
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           pattern: dist-*
+
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PRIVATE_KEY }}
+          permission-contents: write
 
       - name: Create release archives and publish
         run: |
@@ -57,10 +64,12 @@ jobs:
           for binary in $(find dist-* -type f -name 'nix-prefetch-pnpm-deps'); do
             # Extract os and arch from the path
             dir=$(dirname "$binary")
-            # goreleaser puts binaries in dist/nix-prefetch-pnpm-deps_<os>_<arch>/
+
+            # Built binary path looks like dist-x86_64-linux/nix-prefetch-pnpm-deps
             folder_name=$(basename "$dir")
-            os=$(echo "$folder_name" | sed 's/nix-prefetch-pnpm-deps_//' | cut -d'_' -f1)
-            arch=$(echo "$folder_name" | sed 's/nix-prefetch-pnpm-deps_//' | cut -d'_' -f2)
+            platform=$(echo "$folder_name" | sed 's/nix-prefetch-pnpm-deps_//')
+            os=$(echo "$platform" | cut -d'_' -f1)
+            arch=$(echo "$platform" | cut -d'_' -f2)
 
             archive_name="nix-prefetch-pnpm-deps_${VERSION}_${os}_${arch}.tar.gz"
 
@@ -84,4 +93,4 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes-file changelog.md
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}

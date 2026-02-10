@@ -1,2 +1,3 @@
 nix-prefetch-pnpm-deps
 dist/
+result/

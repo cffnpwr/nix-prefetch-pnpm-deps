@@ -21,12 +21,59 @@
           self',
           inputs',
           pkgs,
+          lib,
           system,
           ...
         }:
+        let
+          commonPackageAttrs = {
+            pname = "nix-prefetch-pnpm-deps";
+            version = "1.0.0";
+
+            src = lib.cleanSource ./.;
+
+            vendorHash = "sha256-yMIimiDH8J6iNTeTAAANT7frTBbgZm9o05Ga8VjdGgg=";
+
+            env.CGO_ENABLED = "1";
+            nativeBuildInputs = [ pkgs.pkg-config ];
+
+            meta = {
+              description = "Prefetch pnpm dependencies for Nix builds";
+              homepage = "https://github.com/cffnpwr/nix-prefetch-pnpm-deps";
+              license = lib.licenses.mit;
+              mainProgram = "nix-prefetch-pnpm-deps";
+            };
+          };
+        in
         {
+          packages = {
+            default = pkgs.buildGoModule (
+              commonPackageAttrs
+              // {
+                buildInputs = [ pkgs.zstd ];
+              }
+            );
+
+            static = pkgs.buildGoModule (
+              commonPackageAttrs
+              // {
+                buildInputs = [ (pkgs.zstd.override { static = true; }) ];
+                tags = [
+                  "netgo"
+                  "osusergo"
+                ];
+                postFixup = lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
+                  install_name_tool -change \
+                    ${pkgs.darwin.libresolv}/lib/libresolv.9.dylib \
+                    /usr/lib/libresolv.9.dylib \
+                    $out/bin/nix-prefetch-pnpm-deps
+                '';
+              }
+            );
+          };
+
           devShells.default = pkgs.mkShell {
-            CGO_ENABLED = "1";
+            env.CGO_ENABLED = "1";
 
             buildInputs = with pkgs; [
               git
