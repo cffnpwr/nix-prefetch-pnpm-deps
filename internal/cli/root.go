@@ -25,6 +25,7 @@ func init() {
 	pnpmPathFlag.Register(rootCmd)
 	workspaceFlag.Register(rootCmd)
 	pnpmFlagFlag.Register(rootCmd)
+	preInstallCommandFlag.Register(rootCmd)
 	hashFlag.Register(rootCmd)
 	quietFlag.Register(rootCmd)
 }
@@ -147,6 +148,7 @@ func run(_ *cobra.Command, args []string) error {
 	pnpmPath := pnpmPathFlag.GetString()
 	workspaces := workspaceFlag.GetStringSlice()
 	pnpmFlags := pnpmFlagFlag.GetStringSlice()
+	preInstallCommands := preInstallCommandFlag.GetStringSlice()
 	expectedHash := hashFlag.GetString()
 	quiet := quietFlag.GetBool()
 
@@ -180,11 +182,12 @@ func run(_ *cobra.Command, args []string) error {
 
 	// Run pnpm install to fetch dependencies into the store
 	installOpts := pnpm.InstallOptions{
-		StorePath:  storePath,
-		Workspaces: workspaces,
-		Registry:   os.Getenv("NIX_NPM_REGISTRY"),
-		ExtraFlags: pnpmFlags,
-		WorkingDir: srcPath,
+		StorePath:          storePath,
+		Workspaces:         workspaces,
+		Registry:           os.Getenv("NIX_NPM_REGISTRY"),
+		ExtraFlags:         pnpmFlags,
+		PreInstallCommands: preInstallCommands,
+		WorkingDir:         srcPath,
 	}
 	installErr := p.Install(osFs, installOpts)
 	if installErr != nil {

@@ -12,15 +12,18 @@ import (
 
 // InstallOptions contains options for pnpm install command.
 type InstallOptions struct {
-	StorePath  string   // store-dir path
-	Workspaces []string // --filter flags for workspace filtering
-	Registry   string   // --registry flag (from NIX_NPM_REGISTRY)
-	ExtraFlags []string // additional flags passed to pnpm install
-	WorkingDir string   // directory containing pnpm-lock.yaml
+	StorePath          string   // store-dir path
+	Workspaces         []string // --filter flags for workspace filtering
+	Registry           string   // --registry flag (from NIX_NPM_REGISTRY)
+	ExtraFlags         []string // additional flags passed to pnpm install
+	PreInstallCommands []string // shell commands to run before pnpm install (after config)
+	WorkingDir         string   // directory containing pnpm-lock.yaml
 }
 
 // Install runs pnpm install with the specified options.
 // It configures pnpm settings and runs install with --force, --ignore-scripts, --frozen-lockfile.
+//
+//nolint:funlen // sequential steps (configure → pre-install commands → install) kept together for readability
 func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
 	// Disable manage-package-manager-versions first, from a temporary directory.
 	// If package.json contains a "packageManager" field, pnpm checks it on every command.
@@ -51,6 +54,23 @@ func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
 	for key, value := range configSettings {
 		if err := p.configSet(key, value, opts.WorkingDir); err != nil {
 			return err
+		}
+	}
+
+	// Run pre-install commands (equivalent to nixpkgs' prePnpmInstall)
+	for _, command := range opts.PreInstallCommands {
+		cmd := exec.Command("sh", "-c", command)
+		cmd.Dir = opts.WorkingDir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		err := cmd.Run()
+		if err != nil {
+			return pnpm_err.NewPnpmError(
+				&pnpm_err.FailedToExecuteError{},
+				"failed to execute pre-install command: "+command,
+				err,
+			)
 		}
 	}
 

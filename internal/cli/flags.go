@@ -7,12 +7,13 @@ import (
 )
 
 const (
-	fetcherVersionFlagName = "fetcher-version"
-	pnpmPathFlagName       = "pnpm-path"
-	workspaceFlagName      = "workspace"
-	pnpmFlagFlagName       = "pnpm-flag"
-	hashFlagName           = "hash"
-	quietFlagName          = "quiet"
+	fetcherVersionFlagName    = "fetcher-version"
+	pnpmPathFlagName          = "pnpm-path"
+	workspaceFlagName         = "workspace"
+	pnpmFlagFlagName          = "pnpm-flag"
+	preInstallCommandFlagName = "pre-install-command"
+	hashFlagName              = "hash"
+	quietFlagName             = "quiet"
 )
 
 var (
@@ -54,8 +55,25 @@ supports rich selector syntax as described in https://pnpm.io/filtering`,
 	}
 
 	pnpmFlagFlag = &cobraflags.StringSliceFlag{
-		Name:     pnpmFlagFlagName,
-		Usage:    "additional flag to pass to pnpm commands (can be specified multiple times)",
+		Name: pnpmFlagFlagName,
+		Usage: `additional flag to pass to pnpm commands (can be specified multiple times)
+  e.g. nix-prefetch-pnpm-deps \
+        --pnpm-flag '--os=darwin' \
+        --pnpm-flag '--cpu=x64' \
+        ./source-dir`,
+		Value:    []string{},
+		Required: false,
+	}
+
+	preInstallCommandFlag = &cobraflags.StringSliceFlag{
+		Name: preInstallCommandFlagName,
+		Usage: `shell command to run before pnpm install (can be specified multiple times)
+equivalent to nixpkgs' prePnpmInstall, runs after pnpm config is set
+  e.g. nix-prefetch-pnpm-deps \
+        --fetcher-version 3 \
+        --pre-install-command 'pnpm config set dedupe-peer-dependents false' \
+        --pre-install-command 'pnpm config set auto-install-peers true' \
+        ./source-dir`,
 		Value:    []string{},
 		Required: false,
 	}
