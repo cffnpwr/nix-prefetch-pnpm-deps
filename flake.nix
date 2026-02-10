@@ -26,10 +26,13 @@
         }:
         {
           devShells.default = pkgs.mkShell {
+            CGO_ENABLED = "1";
+
             buildInputs = with pkgs; [
               git
               go
               golangci-lint
+              gopls
               lefthook
               nil
               nixd

@@ -44,7 +44,20 @@ func initPnpm(osFs afero.Fs, pnpmPath string) (*pnpm.Pnpm, error) {
 }
 
 func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (string, error) {
-	// Step 1: Normalize the pnpm store (remove tmp/projects, normalize JSON, set permissions)
+	// Write .fetcher-version to the store directory before Normalize,
+	// because Normalize sets dirs to 0o555 (read-only).
+	// For v3+, .fetcher-version is written to a separate output directory in computeHashWithTarball.
+	//nolint:mnd // fetcherVersion 2 is the only version that writes .fetcher-version to the store
+	if fetcherVersion == 2 {
+		fetcherVersionPath := filepath.Join(storePath, ".fetcher-version")
+		versionContent := fmt.Sprintf("%d\n", fetcherVersion)
+		writeErr := afero.WriteFile(osFs, fetcherVersionPath, []byte(versionContent), 0o444)
+		if writeErr != nil {
+			return "", fmt.Errorf("failed to write .fetcher-version: %w", writeErr)
+		}
+	}
+
+	// Normalize the pnpm store (remove tmp/projects, normalize JSON, set permissions)
 	if normalizeErr := store.Normalize(osFs, store.NormalizeOptions{
 		StorePath:      storePath,
 		FetcherVersion: fetcherVersion,
@@ -54,20 +67,7 @@ func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (stri
 
 	//nolint:mnd // fetcherVersion 3+ uses tarball-based output
 	if fetcherVersion >= 3 {
-		// For fetcherVersion 3+: create output directory with .fetcher-version file and tarball
 		return computeHashWithTarball(osFs, storePath, fetcherVersion)
-	}
-
-	// For fetcherVersion < 3: hash the store directory directly
-	//nolint:mnd // fetcherVersion 2+ includes .fetcher-version file
-	if fetcherVersion >= 2 {
-		// Write .fetcher-version file to the store directory
-		fetcherVersionPath := filepath.Join(storePath, ".fetcher-version")
-		versionContent := fmt.Sprintf("%d\n", fetcherVersion)
-		writeErr := afero.WriteFile(osFs, fetcherVersionPath, []byte(versionContent), 0o444)
-		if writeErr != nil {
-			return "", fmt.Errorf("failed to write .fetcher-version: %w", writeErr)
-		}
 	}
 
 	hash, hashErr := store.Hash(osFs, storePath)
