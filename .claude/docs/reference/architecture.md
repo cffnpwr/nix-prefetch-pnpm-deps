@@ -51,3 +51,14 @@ Controls pnpm execution.
 - `Install(opts InstallOpts)` — Configures pnpm settings then runs install with `--force --ignore-scripts --frozen-lockfile`.
 - Uses `afero.Fs` for filesystem abstraction.
 - Has its own `errors/` subpackage with `PnpmErrorIF` interface.
+
+### `store/`
+
+Processes the pnpm store for reproducible hashing and packaging.
+
+- `Normalize(afs afero.Fs, opts NormalizeOptions)` — Normalizes store for reproducible hashing (removes tmp/projects dirs, normalizes JSON, sets permissions for v2+). `NormalizeOptions` has `StorePath string` and `FetcherVersion int`.
+- `Hash(afs afero.Fs, storePath string)` — Computes NAR hash in SRI format (`sha256-<base64>`) using `go-nix`.
+- `CreateTarball(afs afero.Fs, storePath string, outputPath string)` — Creates reproducible zstd-compressed tarball (fetcher v3+). Byte-identical to `tar --sort=name --mtime="@315532800" --owner=0 --group=0 --numeric-owner --zstd`.
+- Internal: `gnuTarWriter` (GNU tar PAX format), `zstdWriter` (CGo wrapper for C zstd library, level 3, content checksum).
+- Uses `afero.Fs` for filesystem abstraction.
+- Has its own `errors/` subpackage with `StoreErrorIF` interface.

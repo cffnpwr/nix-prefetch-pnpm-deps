@@ -9,12 +9,19 @@ common.BaseError (base struct)
     │   ├── LockfileNotFoundError
     │   ├── FailedToLoadError
     │   └── FailedToParseError
-    └── pnpm/errors/
-        ├── PnpmErrorIF (interface)
-        ├── PnpmNotFoundError
-        ├── FailedToExecuteError
-        ├── FailedToParseError
-        └── OtherError
+    ├── pnpm/errors/
+    │   ├── PnpmErrorIF (interface)
+    │   ├── PnpmNotFoundError
+    │   ├── FailedToExecuteError
+    │   ├── FailedToParseError
+    │   └── OtherError
+    └── store/errors/
+        ├── StoreErrorIF (interface)
+        ├── FailedToCleanupError
+        ├── FailedToCreateTarballError
+        ├── FailedToHashError
+        ├── FailedToNormalizeJSONError
+        └── FailedToSetPermissionsError
 ```
 
 ## BaseError (`internal/common/errors.go`)
