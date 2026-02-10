@@ -7,7 +7,29 @@
   };
 
   outputs =
-    inputs@{ flake-parts, ... }:
+    inputs@{ flake-parts, self, ... }:
+    let
+      mkCommonPackageAttrs =
+        { pkgs, src }:
+        {
+          pname = "nix-prefetch-pnpm-deps";
+          version = "1.0.0";
+
+          inherit src;
+
+          vendorHash = "sha256-yMIimiDH8J6iNTeTAAANT7frTBbgZm9o05Ga8VjdGgg=";
+
+          env.CGO_ENABLED = "1";
+          nativeBuildInputs = [ pkgs.pkg-config ];
+
+          meta = {
+            description = "Prefetch pnpm dependencies for Nix builds";
+            homepage = "https://github.com/cffnpwr/nix-prefetch-pnpm-deps";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "nix-prefetch-pnpm-deps";
+          };
+        };
+    in
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [
         "x86_64-linux"
@@ -15,6 +37,21 @@
         "aarch64-darwin"
         "x86_64-darwin"
       ];
+
+      flake = {
+        overlays.default = final: prev: {
+          nix-prefetch-pnpm-deps = final.buildGoModule (
+            mkCommonPackageAttrs {
+              pkgs = final;
+              src = final.lib.cleanSource self;
+            }
+            // {
+              buildInputs = [ final.zstd ];
+            }
+          );
+        };
+      };
+
       perSystem =
         {
           config,
@@ -26,23 +63,9 @@
           ...
         }:
         let
-          commonPackageAttrs = {
-            pname = "nix-prefetch-pnpm-deps";
-            version = "1.0.0";
-
+          commonPackageAttrs = mkCommonPackageAttrs {
+            inherit pkgs;
             src = lib.cleanSource ./.;
-
-            vendorHash = "sha256-yMIimiDH8J6iNTeTAAANT7frTBbgZm9o05Ga8VjdGgg=";
-
-            env.CGO_ENABLED = "1";
-            nativeBuildInputs = [ pkgs.pkg-config ];
-
-            meta = {
-              description = "Prefetch pnpm dependencies for Nix builds";
-              homepage = "https://github.com/cffnpwr/nix-prefetch-pnpm-deps";
-              license = lib.licenses.mit;
-              mainProgram = "nix-prefetch-pnpm-deps";
-            };
           };
         in
         {

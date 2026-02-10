@@ -18,6 +18,32 @@ nix run github:cffnpwr/nix-prefetch-pnpm-deps
 nix profile install github:cffnpwr/nix-prefetch-pnpm-deps
 ```
 
+### Nix Flake Overlay
+
+This flake can be used as a nixpkgs overlay.
+Applying the overlay makes the package available as `pkgs.nix-prefetch-pnpm-deps`.
+
+```nix
+# flake.nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nix-prefetch-pnpm-deps.url = "github:cffnpwr/nix-prefetch-pnpm-deps";
+  };
+
+  outputs = { nixpkgs, nix-prefetch-pnpm-deps, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        {
+          nixpkgs.overlays = [ nix-prefetch-pnpm-deps.overlays.default ];
+          # pkgs.nix-prefetch-pnpm-deps is now available
+        }
+      ];
+    };
+  };
+}
+```
+
 ### Nix (non-Flakes)
 
 ```bash
@@ -26,7 +52,7 @@ nix-env -if https://github.com/cffnpwr/nix-prefetch-pnpm-deps/archive/main.tar.g
 
 ### Github Release
 
-TBD
+Download from [Github Release](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/releases)
 
 ### Go install
 
