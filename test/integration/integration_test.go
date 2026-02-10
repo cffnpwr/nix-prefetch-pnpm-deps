@@ -138,6 +138,15 @@ func executeCLI(t *testing.T, args []string) (string, error) {
 	return hash, execErr
 }
 
+// pnpmCPU maps runtime.GOARCH to pnpm's --cpu value (Node.js process.arch).
+func pnpmCPU() string {
+	if runtime.GOARCH == "amd64" {
+		return "x64"
+	}
+
+	return runtime.GOARCH
+}
+
 // extractLastLine returns the last non-empty line from the output.
 func extractLastLine(output string) string {
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
@@ -195,6 +204,9 @@ func TestIntegration(t *testing.T) {
 			srcHash:        "sha256-GopiyaY8lfrgV2tRDSy+qC5AndxIHtGbsAJ51mRi8mU=",
 			hashByPlatform: map[string]string{
 				"darwin-arm64": "sha256-VIlwcVlhObqj3WKbB2qhGqDByisQvMrzquQZ5V1NgNE=",
+				"darwin-amd64": "sha256-YXtCOh8RnSDMuA9DRvkHOTxIJnqY5+coMlkuGobG1QY=",
+				"linux-amd64":  "sha256-54d38QVrs2J+i/XH/uzNoFhjqkgTMtZMhbIw9YCYjNA=",
+				"linux-arm64":  "sha256-X852T/pffK1XP0ztK0rPzhyVWHSVQxhtgMuD3hlrMWE=",
 			},
 		},
 	}
@@ -208,6 +220,8 @@ func TestIntegration(t *testing.T) {
 			args := []string{
 				"--fetcher-version", strconv.Itoa(tt.fetcherVersion),
 				"--pnpm-path", pnpmPath,
+				"--pnpm-flag", "--os=" + runtime.GOOS,
+				"--pnpm-flag", "--cpu=" + pnpmCPU(),
 				"--hash=",
 				srcPath,
 			}
@@ -223,7 +237,7 @@ func TestIntegration(t *testing.T) {
 				var ok bool
 				expected, ok = tt.hashByPlatform[platform]
 				if !ok {
-					t.Skipf("no expected hash for platform %s; actual hash: %s (add this to hashByPlatform)", platform, output)
+					t.Fatalf("no expected hash for platform %s; actual hash: %s (add this to hashByPlatform)", platform, output)
 				}
 			}
 
@@ -252,6 +266,8 @@ func TestIntegrationHashFlag(t *testing.T) {
 		args := []string{
 			"--fetcher-version", "1",
 			"--pnpm-path", pnpmPath,
+			"--pnpm-flag", "--os=" + runtime.GOOS,
+			"--pnpm-flag", "--cpu=" + pnpmCPU(),
 			"--hash", "sha256-PfgCw2FUEY0OfErfyPnMCLUlO8b4UC/Q5mIG7lezT/w=",
 			srcPath,
 		}
@@ -268,6 +284,8 @@ func TestIntegrationHashFlag(t *testing.T) {
 		args := []string{
 			"--fetcher-version", "1",
 			"--pnpm-path", pnpmPath,
+			"--pnpm-flag", "--os=" + runtime.GOOS,
+			"--pnpm-flag", "--cpu=" + pnpmCPU(),
 			"--hash", "sha256-INVALIDHASH",
 			srcPath,
 		}
