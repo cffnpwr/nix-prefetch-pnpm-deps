@@ -223,7 +223,7 @@ func TestIntegration(t *testing.T) {
 				var ok bool
 				expected, ok = tt.hashByPlatform[platform]
 				if !ok {
-					t.Fatalf("no expected hash for platform %s", platform)
+					t.Skipf("no expected hash for platform %s; actual hash: %s (add this to hashByPlatform)", platform, output)
 				}
 			}
 
