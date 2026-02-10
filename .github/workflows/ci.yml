@@ -2,36 +2,40 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.25.5"
-      - run: sudo apt-get update && sudo apt-get install -y libzstd-dev pkg-config
-      - uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.8.0
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Nix
+        uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
+
+      - name: Run golangci-lint
+        run: nix develop --command golangci-lint run ./...
 
   unit-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.25.5"
-      - run: sudo apt-get update && sudo apt-get install -y libzstd-dev pkg-config
-      - run: go test ./...
-        env:
-          CGO_ENABLED: "1"
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Nix
+        uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
+
+      - name: Run unit tests
+        run: nix develop --command go test ./...
 
   integration-test:
+    if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
@@ -42,6 +46,11 @@ jobs:
           - macos-13
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/determinate-nix-action@v3
-      - run: nix develop --command go test -tags integration -v -timeout 30m ./test/integration/
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Nix
+        uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
+
+      - name: Run integration tests
+        run: nix develop --command go test -tags integration -v -timeout 30m ./test/integration/

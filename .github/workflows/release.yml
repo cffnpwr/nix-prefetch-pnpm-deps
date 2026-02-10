@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-15
+          - macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libzstd (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libzstd-dev pkg-config
+
+      - name: Install libzstd (macOS)
+        if: runner.os == 'macOS'
+        run: brew install zstd pkg-config
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          args: build --clean --single-target
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ runner.os }}-${{ runner.arch }}
+          path: dist/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+
+      - name: Create release archives and publish
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+
+          # Find all binaries and create archives
+          for binary in $(find dist-* -type f -name 'nix-prefetch-pnpm-deps'); do
+            # Extract os and arch from the path
+            dir=$(dirname "$binary")
+            # goreleaser puts binaries in dist/nix-prefetch-pnpm-deps_<os>_<arch>/
+            folder_name=$(basename "$dir")
+            os=$(echo "$folder_name" | sed 's/nix-prefetch-pnpm-deps_//' | cut -d'_' -f1)
+            arch=$(echo "$folder_name" | sed 's/nix-prefetch-pnpm-deps_//' | cut -d'_' -f2)
+
+            archive_name="nix-prefetch-pnpm-deps_${VERSION}_${os}_${arch}.tar.gz"
+
+            # Create a temporary directory for the archive contents
+            tmpdir=$(mktemp -d)
+            cp "$binary" "$tmpdir/"
+            cp LICENSE README.md "$tmpdir/" 2>/dev/null || true
+            tar -czf "$archive_name" -C "$tmpdir" .
+            rm -rf "$tmpdir"
+          done
+
+          # Generate checksums
+          sha256sum *.tar.gz > checksums.txt
+
+          # Generate changelog
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          git log ${PREV_TAG}..HEAD --pretty=format:"* %s (%h)" > changelog.md
+
+          # Create release
+          gh release create $GITHUB_REF_NAME *.tar.gz checksums.txt \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file changelog.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

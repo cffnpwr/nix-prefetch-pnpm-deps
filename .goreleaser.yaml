@@ -1,0 +1,26 @@
+version: 2
+
+builds:
+  - main: .
+    binary: nix-prefetch-pnpm-deps
+    env:
+      - CGO_ENABLED=1
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: [-s, -w]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+
+release:
+  disable: true  # Release created separately via gh release create
