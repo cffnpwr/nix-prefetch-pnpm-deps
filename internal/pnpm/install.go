@@ -35,9 +35,7 @@ func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
 			tmpErr,
 		)
 	}
-	defer func() {
-		_ = fs.RemoveAll(tmpDir)
-	}()
+	defer func() { _ = fs.RemoveAll(tmpDir) }()
 
 	if err := p.configSet("manage-package-manager-versions", "false", tmpDir); err != nil {
 		return err
