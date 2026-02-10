@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.1.0...v1.1.1) (2026-02-10)
+
+
+### Bug Fixes
+
+* :bug: fix release workflow ([#7](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/issues/7)) ([d480186](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/d480186e2803d22481c133cc2eb8da81e5a0e703))
+
 ## [1.1.0](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.0.0...v1.1.0) (2026-02-10)
 
 
