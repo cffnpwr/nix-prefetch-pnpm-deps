@@ -39,11 +39,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - ubuntu-24.04
-          - ubuntu-24.04-arm
-          - macos-15
-          - macos-15-intel
+        include:
+          - runner: ubuntu-24.04
+            nix-system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            nix-system: aarch64-linux
+          - runner: macos-15
+            nix-system: aarch64-darwin
+          - runner: macos-15
+            nix-system: x86_64-darwin
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -53,4 +57,4 @@ jobs:
         uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
 
       - name: Run integration tests
-        run: nix develop --command go test -tags integration -v -timeout 30m ./test/integration/
+        run: nix develop --system ${{ matrix.nix-system }} --command go test -tags integration -v -timeout 30m ./test/integration/

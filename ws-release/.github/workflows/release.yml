@@ -9,11 +9,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - ubuntu-24.04
-          - ubuntu-24.04-arm
-          - macos-15
-          - macos-15-intel
+        include:
+          - runner: ubuntu-24.04
+            nix-system: x86_64-linux
+            goos: linux
+            goarch: amd64
+          - runner: ubuntu-24.04-arm
+            nix-system: aarch64-linux
+            goos: linux
+            goarch: arm64
+          - runner: macos-15
+            nix-system: aarch64-darwin
+            goos: darwin
+            goarch: arm64
+          - runner: macos-15
+            nix-system: x86_64-darwin
+            goos: darwin
+            goarch: amd64
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -23,12 +35,12 @@ jobs:
         uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
 
       - name: Build
-        run: nix develop --command go build -trimpath -ldflags '-s -w' -o dist/nix-prefetch-pnpm-deps .
+        run: nix develop --system ${{ matrix.nix-system }} --command go build -trimpath -ldflags '-s -w' -o dist/nix-prefetch-pnpm-deps .
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: dist-${{ runner.os }}-${{ runner.arch }}
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/
 
   upload-assets:
@@ -53,19 +65,10 @@ jobs:
             binary="$dir/nix-prefetch-pnpm-deps"
             [ -f "$binary" ] || continue
 
-            # Extract OS and arch from directory name: dist-<OS>-<ARCH>
+            # dist-<goos>-<goarch>
             os_arch="${dir#dist-}"
-            os=$(echo "$os_arch" | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
+            os=$(echo "$os_arch" | cut -d'-' -f1)
             arch=$(echo "$os_arch" | cut -d'-' -f2)
-
-            # Map GitHub runner names to Go names
-            case "$arch" in
-              X64) arch="amd64" ;;
-              ARM64) arch="arm64" ;;
-            esac
-            case "$os" in
-              macos) os="darwin" ;;
-            esac
 
             archive_name="nix-prefetch-pnpm-deps_${VERSION}_${os}_${arch}.tar.gz"
             tmpdir=$(mktemp -d)
