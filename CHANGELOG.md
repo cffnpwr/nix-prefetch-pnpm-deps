@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.0.0...v1.1.0) (2026-02-10)
+
+
+### Features
+
+* :sparkles: nix flake overlayを追加 ([5142b50](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/5142b50d88d3d2fa6d42cda56ab27b7cfc57e7c2))
+* ✨ fetchPnpmDepsと差異のある部分の追加 ([#3](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/issues/3)) ([57886f3](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/57886f3694d8b3a97b63ab1e55c38e4554f1669d))
+
 ## 1.0.0 (2026-02-10)
 
 
