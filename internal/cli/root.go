@@ -150,13 +150,15 @@ func run(_ *cobra.Command, args []string) error {
 	defer os.RemoveAll(storePath)
 
 	// Run pnpm install to fetch dependencies into the store
-	if installErr := p.Install(pnpm.InstallOptions{
+	installOpts := pnpm.InstallOptions{
 		StorePath:  storePath,
 		Workspaces: workspaces,
 		Registry:   os.Getenv("NIX_NPM_REGISTRY"),
 		ExtraFlags: pnpmFlags,
 		WorkingDir: srcPath,
-	}); installErr != nil {
+	}
+	installErr := p.Install(osFs, installOpts)
+	if installErr != nil {
 		return installErr
 	}
 

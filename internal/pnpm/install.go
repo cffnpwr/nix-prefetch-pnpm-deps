@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/spf13/afero"
+
 	pnpm_err "github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/pnpm/errors"
 )
 
@@ -19,13 +21,33 @@ type InstallOptions struct {
 
 // Install runs pnpm install with the specified options.
 // It configures pnpm settings and runs install with --force, --ignore-scripts, --frozen-lockfile.
-func (p *Pnpm) Install(opts InstallOptions) pnpm_err.PnpmErrorIF {
-	// Configure pnpm settings
+func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
+	// Disable manage-package-manager-versions first, from a temporary directory.
+	// If package.json contains a "packageManager" field, pnpm checks it on every command.
+	// Running this config set in the source directory would fail because pnpm tries to
+	// download the specified version before the config is applied (chicken-and-egg problem).
+	// Using a temp directory avoids triggering the packageManager check.
+	tmpDir, tmpErr := afero.TempDir(fs, "", "pnpm-config-")
+	if tmpErr != nil {
+		return pnpm_err.NewPnpmError(
+			&pnpm_err.FailedToExecuteError{},
+			"failed to create temp directory for pnpm config",
+			tmpErr,
+		)
+	}
+	defer func() {
+		_ = fs.RemoveAll(tmpDir)
+	}()
+
+	if err := p.configSet("manage-package-manager-versions", "false", tmpDir); err != nil {
+		return err
+	}
+
+	// Configure remaining pnpm settings in the source directory
 	configSettings := map[string]string{
-		"store-dir":                       opts.StorePath,
-		"side-effects-cache":              "false",
-		"manage-package-manager-versions": "false",
-		"update-notifier":                 "false",
+		"store-dir":          opts.StorePath,
+		"side-effects-cache": "false",
+		"update-notifier":    "false",
 	}
 
 	for key, value := range configSettings {
