@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -70,7 +71,7 @@ func testMain(m *testing.M) int {
 	var err error
 
 	// Get nix path
-	fmt.Println("Getting nix path...")
+	fmt.Fprintln(os.Stderr, "Getting nix path...")
 	nixPath, err = getNixPath()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to get nix path: %v\n", err)
@@ -78,9 +79,9 @@ func testMain(m *testing.M) int {
 	}
 
 	// Get pnpm paths
-	fmt.Println("Getting pnpm paths...")
+	fmt.Fprintln(os.Stderr, "Getting pnpm paths...")
 	for pkg := range pnpmPaths {
-		fmt.Printf("  Getting %s\n", pkg)
+		fmt.Fprintf(os.Stderr, "  Getting %s\n", pkg)
 		pnpmPath, getPnpmErr := getPnpmPath(nixPath, pkg)
 		if getPnpmErr != nil {
 			fmt.Fprintf(os.Stderr, "failed to get pnpm path for %s: %v\n", pkg, getPnpmErr)
@@ -91,9 +92,9 @@ func testMain(m *testing.M) int {
 	}
 
 	// Get source paths
-	fmt.Println("Getting source paths...")
+	fmt.Fprintln(os.Stderr, "Getting source paths...")
 	for name, srcInfo := range srcs {
-		fmt.Printf("  Getting source for %s\n", name)
+		fmt.Fprintf(os.Stderr, "  Getting source for %s\n", name)
 		storePath, fetchErr := fetchSource(nixPath, srcInfo)
 		if fetchErr != nil {
 			fmt.Fprintf(os.Stderr, "failed to fetch source for %s: %v\n", name, fetchErr)
@@ -126,12 +127,12 @@ func testMain(m *testing.M) int {
 
 // getNixPath returns the nix binary path.
 func getNixPath() (string, error) {
-	nixPath, err := exec.LookPath("nix")
+	p, err := exec.LookPath("nix")
 	if err != nil {
-		return "", fmt.Errorf("nix is not installed or not in PATH: %v", err)
+		return "", fmt.Errorf("nix is not installed or not in PATH: %w", err)
 	}
 
-	return nixPath, nil
+	return p, nil
 }
 
 // nixBuild runs "nix build <args> --no-link --print-out-paths" and returns the store path.
@@ -149,7 +150,7 @@ func nixBuild(nixPath string, args ...string) (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("nix build failed: %v\nstderr: %s", err, stderr.String())
+		return "", fmt.Errorf("nix build failed: %w\nstderr: %s", err, stderr.String())
 	}
 
 	return strings.TrimSpace(stdout.String()), nil
@@ -162,7 +163,7 @@ func getPnpmPath(nixPath, pnpmPkg string) (string, error) {
 		fmt.Sprintf("github:NixOS/nixpkgs/%s#%s", nixpkgsRev, pnpmPkg),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to build pnpm package %s: %v", pnpmPkg, err)
+		return "", fmt.Errorf("failed to build pnpm package %s: %w", pnpmPkg, err)
 	}
 
 	return storePath + "/bin/pnpm", nil
@@ -258,7 +259,7 @@ type hash interface {
 
 type singleHash string
 
-func (h singleHash) hash(platform string) string {
+func (h singleHash) hash(_ string) string {
 	return string(h)
 }
 
@@ -269,7 +270,6 @@ func (h hashByPlatform) hash(platform string) string {
 }
 
 func TestIntegration(t *testing.T) {
-
 	tests := []struct {
 		name           string
 		fetcherVersion int
@@ -327,14 +327,13 @@ func TestIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-		
 			wantHash := ""
 			if tt.wantHash != nil {
 				wantHash = tt.wantHash.hash(fmt.Sprintf("%s-%s", runtime.GOARCH, runtime.GOOS))
 			}
 			srcPath := copyToWritable(t, tt.srcPath)
 			args := []string{
-				"--fetcher-version", fmt.Sprintf("%d", tt.fetcherVersion),
+				"--fetcher-version", strconv.Itoa(tt.fetcherVersion),
 				"--pnpm-path", tt.pnpmPath,
 			}
 			args = append(args, tt.additionalArgs...)
@@ -352,7 +351,6 @@ func TestIntegration(t *testing.T) {
 }
 
 func TestIntegrationHashFlag(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		hashFlag string
@@ -372,7 +370,6 @@ func TestIntegrationHashFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-		
 			pnpmPath := pnpmPaths["pnpm_9"]
 			srcPath := copyToWritable(t, srcPaths["synchrony"])
 
