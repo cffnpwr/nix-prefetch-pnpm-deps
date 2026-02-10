@@ -5,32 +5,72 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/spf13/afero"
+
 	pnpm_err "github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/pnpm/errors"
 )
 
 // InstallOptions contains options for pnpm install command.
 type InstallOptions struct {
-	StorePath  string   // store-dir path
-	Workspaces []string // --filter flags for workspace filtering
-	Registry   string   // --registry flag (from NIX_NPM_REGISTRY)
-	ExtraFlags []string // additional flags passed to pnpm install
-	WorkingDir string   // directory containing pnpm-lock.yaml
+	StorePath          string   // store-dir path
+	Workspaces         []string // --filter flags for workspace filtering
+	Registry           string   // --registry flag (from NIX_NPM_REGISTRY)
+	ExtraFlags         []string // additional flags passed to pnpm install
+	PreInstallCommands []string // shell commands to run before pnpm install (after config)
+	WorkingDir         string   // directory containing pnpm-lock.yaml
 }
 
 // Install runs pnpm install with the specified options.
 // It configures pnpm settings and runs install with --force, --ignore-scripts, --frozen-lockfile.
-func (p *Pnpm) Install(opts InstallOptions) pnpm_err.PnpmErrorIF {
-	// Configure pnpm settings
+//
+//nolint:funlen // sequential steps (configure → pre-install commands → install) kept together for readability
+func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
+	// Disable manage-package-manager-versions first, from a temporary directory.
+	// If package.json contains a "packageManager" field, pnpm checks it on every command.
+	// Running this config set in the source directory would fail because pnpm tries to
+	// download the specified version before the config is applied (chicken-and-egg problem).
+	// Using a temp directory avoids triggering the packageManager check.
+	tmpDir, tmpErr := afero.TempDir(fs, "", "pnpm-config-")
+	if tmpErr != nil {
+		return pnpm_err.NewPnpmError(
+			&pnpm_err.FailedToExecuteError{},
+			"failed to create temp directory for pnpm config",
+			tmpErr,
+		)
+	}
+	defer func() { _ = fs.RemoveAll(tmpDir) }()
+
+	if err := p.configSet("manage-package-manager-versions", "false", tmpDir); err != nil {
+		return err
+	}
+
+	// Configure remaining pnpm settings in the source directory
 	configSettings := map[string]string{
-		"store-dir":                       opts.StorePath,
-		"side-effects-cache":              "false",
-		"manage-package-manager-versions": "false",
-		"update-notifier":                 "false",
+		"store-dir":          opts.StorePath,
+		"side-effects-cache": "false",
+		"update-notifier":    "false",
 	}
 
 	for key, value := range configSettings {
 		if err := p.configSet(key, value, opts.WorkingDir); err != nil {
 			return err
+		}
+	}
+
+	// Run pre-install commands (equivalent to nixpkgs' prePnpmInstall)
+	for _, command := range opts.PreInstallCommands {
+		cmd := exec.Command("sh", "-c", command)
+		cmd.Dir = opts.WorkingDir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		err := cmd.Run()
+		if err != nil {
+			return pnpm_err.NewPnpmError(
+				&pnpm_err.FailedToExecuteError{},
+				"failed to execute pre-install command: "+command,
+				err,
+			)
 		}
 	}
 

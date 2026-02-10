@@ -25,6 +25,7 @@ func init() {
 	pnpmPathFlag.Register(rootCmd)
 	workspaceFlag.Register(rootCmd)
 	pnpmFlagFlag.Register(rootCmd)
+	preInstallCommandFlag.Register(rootCmd)
 	hashFlag.Register(rootCmd)
 	quietFlag.Register(rootCmd)
 }
@@ -41,6 +42,28 @@ func initPnpm(osFs afero.Fs, pnpmPath string) (*pnpm.Pnpm, error) {
 
 	p, pnpmErr := pnpm.WithPathEnvVar(osFs)
 	return p, pnpmErr
+}
+
+// validateLockfileVersion verifies lockfile version is compatible with pnpm version.
+func validateLockfileVersion(l *lockfile.Lockfile, p *pnpm.Pnpm) error {
+	lockfileVer, lockfileVerErr := l.MajorVersion()
+	if lockfileVerErr != nil {
+		return lockfileVerErr
+	}
+
+	pnpmVer, pnpmVerErr := p.MajorVersion()
+	if pnpmVerErr != nil {
+		return pnpmVerErr
+	}
+	if lockfileVer > pnpmVer {
+		return fmt.Errorf(
+			"lockfileVersion %s in pnpm-lock.yaml is too new for the provided pnpm version %d",
+			l.LockfileVersion,
+			pnpmVer,
+		)
+	}
+
+	return nil
 }
 
 func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (string, error) {
@@ -80,11 +103,11 @@ func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (stri
 
 func computeHashWithTarball(osFs afero.Fs, storePath string, fetcherVersion int) (string, error) {
 	// Create temporary output directory for .fetcher-version and tarball
-	outDir, err := os.MkdirTemp("", "nix-prefetch-pnpm-out-")
+	outDir, err := afero.TempDir(osFs, "", "nix-prefetch-pnpm-out-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = osFs.RemoveAll(outDir) }()
 
 	// Write .fetcher-version file
 	fetcherVersionPath := filepath.Join(outDir, ".fetcher-version")
@@ -115,6 +138,7 @@ func computeHashWithTarball(osFs afero.Fs, storePath string, fetcherVersion int)
 	return hash, nil
 }
 
+//nolint:cyclop,funlen // run function is the main command logic
 func run(_ *cobra.Command, args []string) error {
 	fetcherVersion, err := fetcherVersionFlag.GetIntE()
 	if err != nil {
@@ -124,6 +148,7 @@ func run(_ *cobra.Command, args []string) error {
 	pnpmPath := pnpmPathFlag.GetString()
 	workspaces := workspaceFlag.GetStringSlice()
 	pnpmFlags := pnpmFlagFlag.GetStringSlice()
+	preInstallCommands := preInstallCommandFlag.GetStringSlice()
 	expectedHash := hashFlag.GetString()
 	quiet := quietFlag.GetBool()
 
@@ -132,7 +157,8 @@ func run(_ *cobra.Command, args []string) error {
 
 	// Verify lockfile exists and is valid
 	lockfilePath := filepath.Join(srcPath, "pnpm-lock.yaml")
-	if _, loadErr := lockfile.Load(osFs, lockfilePath); loadErr != nil {
+	lf, loadErr := lockfile.Load(osFs, lockfilePath)
+	if loadErr != nil {
 		return loadErr
 	}
 
@@ -142,21 +168,29 @@ func run(_ *cobra.Command, args []string) error {
 		return pnpmErr
 	}
 
+	// Validate lockfile version against pnpm version
+	if verErr := validateLockfileVersion(lf, p); verErr != nil {
+		return verErr
+	}
+
 	// Create temp directory for pnpm store
-	storePath, err := os.MkdirTemp("", "nix-prefetch-pnpm-deps-")
+	storePath, err := afero.TempDir(osFs, "", "nix-prefetch-pnpm-deps-")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(storePath)
+	defer func() { _ = osFs.RemoveAll(storePath) }()
 
 	// Run pnpm install to fetch dependencies into the store
-	if installErr := p.Install(pnpm.InstallOptions{
-		StorePath:  storePath,
-		Workspaces: workspaces,
-		Registry:   os.Getenv("NIX_NPM_REGISTRY"),
-		ExtraFlags: pnpmFlags,
-		WorkingDir: srcPath,
-	}); installErr != nil {
+	installOpts := pnpm.InstallOptions{
+		StorePath:          storePath,
+		Workspaces:         workspaces,
+		Registry:           os.Getenv("NIX_NPM_REGISTRY"),
+		ExtraFlags:         pnpmFlags,
+		PreInstallCommands: preInstallCommands,
+		WorkingDir:         srcPath,
+	}
+	installErr := p.Install(osFs, installOpts)
+	if installErr != nil {
 		return installErr
 	}
 
@@ -168,7 +202,7 @@ func run(_ *cobra.Command, args []string) error {
 
 	// Verify against expected hash if provided
 	if expectedHash != "" && hash != expectedHash {
-		return fmt.Errorf("hash mismatch: expected %s, got %s", expectedHash, hash)
+		return fmt.Errorf("hash mismatch:\n  expected %s\n  got %s", expectedHash, hash)
 	}
 
 	if !quiet {

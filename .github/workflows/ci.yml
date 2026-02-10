@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -47,7 +48,9 @@ jobs:
         run: nix develop --command go test ./...
 
   integration-test:
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
     strategy:
       fail-fast: false
       matrix:
@@ -70,3 +73,38 @@ jobs:
 
       - name: Run integration tests
         run: nix develop --system ${{ matrix.nix-system }} --command go test -tags integration -v -timeout 30m ./test/integration/
+
+  is-check-passed:
+    name: Check all checks passed
+    needs:
+      - format-check
+      - lint
+      - unit-test
+      - integration-test
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check results
+        run: |
+          if [[ "${{ needs.format-check.result }}" != "success" ]]; then
+            echo "format check failed"
+            exit 1
+          fi
+
+          if [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo "lint check failed"
+            exit 1
+          fi
+
+          if [[ "${{ needs.unit-test.result }}" != "success" ]]; then
+            echo "unit test failed"
+            exit 1
+          fi
+
+          # If integration test was expected to run, check the result
+          if [[ "${{ needs.integration-test.result }}" != "success" && "${{ needs.integration-test.result }}" != "skipped" ]]; then
+            echo "integration test failed"
+            exit 1
+          fi
+
+          echo "all checks passed"
