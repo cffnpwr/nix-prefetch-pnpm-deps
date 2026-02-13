@@ -18,7 +18,7 @@ type textLogger struct {
 }
 
 func newTextLogger(level LogLevel, w io.Writer, ci CI) Logger {
-	handler := slog.NewTextHandler(w, &slog.HandlerOptions{Level: level})
+	handler := newTextHandler(w, level)
 	return &textLogger{
 		logger: slog.New(handler),
 		level:  level,
@@ -49,7 +49,7 @@ func (l *textLogger) Fatalf(tmpl string, args ...any) {
 
 func (l *textLogger) StepLogger(logLevel LogLevel, msg string) StepLogger {
 	start := time.Now()
-	l.log(logLevel, msg)
+	l.log(logLevel, "start "+msg)
 
 	return &textStepLogger{
 		logger:   l,
@@ -62,10 +62,11 @@ func (l *textLogger) StepLogger(logLevel LogLevel, msg string) StepLogger {
 func (l *textLogger) CommandLogger(logLevel LogLevel, name string) CommandLogger {
 	start := time.Now()
 	cl := &textCommandLogger{
-		logger:   l,
-		logLevel: logLevel,
-		name:     name,
-		start:    start.Round(0), // Remove monotonic time
+		logger:       l,
+		scopedLogger: l.logger.With("scope", name),
+		logLevel:     logLevel,
+		name:         name,
+		start:        start.Round(0), // Remove monotonic time
 	}
 	cl.writeFoldStart()
 	return cl
@@ -99,15 +100,16 @@ func (s *textStepLogger) Fail(err error) {
 
 // textCommandLogger implements CommandLogger for text mode.
 type textCommandLogger struct {
-	logger   *textLogger
-	logLevel LogLevel
-	name     string
-	start    time.Time
+	logger       *textLogger
+	scopedLogger *slog.Logger
+	logLevel     LogLevel
+	name         string
+	start        time.Time
 }
 
 func (c *textCommandLogger) Write(p []byte) (n int, err error) {
 	for line := range strings.SplitSeq(strings.Trim(string(p), "\n"), "\n") {
-		c.logger.logger.Info(line, "scope", c.name)
+		c.scopedLogger.Info(line)
 	}
 	return len(p), nil
 }
