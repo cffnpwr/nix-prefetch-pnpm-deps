@@ -28,6 +28,8 @@ type (
 )
 
 var (
+	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+
 	doneStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	warnStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	failStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
@@ -52,6 +54,7 @@ type activeEntry struct {
 func newTUIModel() tuiModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
+	s.Style = spinnerStyle
 	return tuiModel{
 		spinner: s,
 	}
