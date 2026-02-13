@@ -99,17 +99,26 @@
             env.CGO_ENABLED = "1";
 
             buildInputs = with pkgs; [
+              # development tools
               git
-              go
-              golangci-lint
-              gopls
               lefthook
+              gopls
+
+              # linter/formatter
+              golangci-lint
               nil
               nixd
               nixfmt
-              pkg-config
               treefmt
+
+              # build tools/dependencies
+              go
+              pkg-config
               zstd
+
+              # for operation check
+              pnpm_10
+              nodejs_24
             ];
 
             shellHook = ''

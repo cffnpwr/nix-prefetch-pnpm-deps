@@ -25,6 +25,7 @@ type (
 		exitCode int
 		elapsed  time.Duration
 	}
+	interruptMsg struct{}
 )
 
 var (
@@ -68,6 +69,12 @@ func (m tuiModel) Init() tea.Cmd {
 func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.QuitMsg:
+		m.quitting = true
+		return m, tea.Quit
+
+	case interruptMsg:
+		m.active = nil
+		m.lines = append(m.lines, warnStyle.Render("!")+" interrupted")
 		m.quitting = true
 		return m, tea.Quit
 

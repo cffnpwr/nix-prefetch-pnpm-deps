@@ -304,6 +304,75 @@ func Test_tuiModel_Update_QuitMsg(t *testing.T) {
 	}
 }
 
+func Test_tuiModel_Update_interruptMsg(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		setup      func() tuiModel
+		wantLines  int
+		wantActive bool
+	}{
+		{
+			name:       "[正常系] activeがnilのときinterruptMsgでquittingが設定される",
+			setup:      func() tuiModel { return newTUIModel() },
+			wantLines:  1,
+			wantActive: false,
+		},
+		{
+			name: "[正常系] step実行中にinterruptMsgでactiveがクリアされる",
+			setup: func() tuiModel {
+				m := newTUIModel()
+				m = updateModel(m, stepStartMsg{msg: "loading lockfile"})
+				return m
+			},
+			wantLines:  1,
+			wantActive: false,
+		},
+		{
+			name: "[正常系] command実行中にinterruptMsgでactiveがクリアされる",
+			setup: func() tuiModel {
+				m := newTUIModel()
+				m = updateModel(m, cmdStartMsg{name: "pnpm install"})
+				m = updateModel(m, cmdLineMsg{line: "resolving..."})
+				return m
+			},
+			wantLines:  1,
+			wantActive: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := tt.setup()
+			updated, cmd := m.Update(interruptMsg{})
+			result := updated.(tuiModel)
+
+			if !result.quitting {
+				t.Error("quitting should be true")
+			}
+			if cmd == nil {
+				t.Error("cmd should not be nil (tea.Quit)")
+			}
+			if (result.active != nil) != tt.wantActive {
+				t.Errorf("active != nil is %v, want %v", result.active != nil, tt.wantActive)
+			}
+			if len(result.lines) != tt.wantLines {
+				t.Fatalf("lines length = %d, want %d", len(result.lines), tt.wantLines)
+			}
+			if !strings.Contains(result.lines[len(result.lines)-1], "interrupted") {
+				t.Errorf(
+					"last line = %q, want to contain %q",
+					result.lines[len(result.lines)-1],
+					"interrupted",
+				)
+			}
+		})
+	}
+}
+
 func Test_tuiModel_View(t *testing.T) {
 	t.Parallel()
 
@@ -378,6 +447,19 @@ func Test_tuiModel_View(t *testing.T) {
 			wantAbsent: []string{
 				"| line0", "| line1\n", "| line2\n", "| line3\n", "| line4\n",
 			},
+		},
+		{
+			name: "[正常系] interruptMsg後はinterrupted行のみ表示されスピナーは表示されない",
+			setup: func() tuiModel {
+				m := newTUIModel()
+				m = updateModel(m, logLineMsg{line: "line1"})
+				m = updateModel(m, cmdStartMsg{name: "pnpm install"})
+				m = updateModel(m, cmdLineMsg{line: "resolving..."})
+				m = updateModel(m, interruptMsg{})
+				return m
+			},
+			wantContains: []string{"line1", "interrupted"},
+			wantAbsent:   []string{"Executing", "pnpm install", "resolving..."},
 		},
 	}
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/signal"
 	"sync"
 	"time"
 
@@ -13,19 +14,38 @@ import (
 
 // tuiLogger implements Logger with Bubble Tea TUI.
 type tuiLogger struct {
-	program *tea.Program
-	level   LogLevel
-	mu      sync.Mutex
+	program   *tea.Program
+	level     LogLevel
+	mu        sync.Mutex
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 func newTUILogger(level LogLevel, w io.Writer) Logger {
 	m := newTUIModel()
-	p := tea.NewProgram(m, tea.WithOutput(w))
+	p := tea.NewProgram(m, tea.WithOutput(w), tea.WithInput(nil), tea.WithoutSignalHandler())
+	done := make(chan struct{})
 	l := &tuiLogger{
 		program: p,
 		level:   level,
+		done:    done,
 	}
 	go func() { _, _ = p.Run() }()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	go func() {
+		select {
+		case <-sigCh:
+			signal.Stop(sigCh)
+			l.send(interruptMsg{})
+			l.program.Wait()
+			os.Exit(130) //nolint:mnd // 128 + SIGINT(2)
+		case <-done:
+			signal.Stop(sigCh)
+		}
+	}()
+
 	return l
 }
 
@@ -114,8 +134,11 @@ func (l *tuiLogger) CommandLogger(logLevel LogLevel, name string) CommandLogger 
 }
 
 func (l *tuiLogger) Close() error {
-	l.program.Quit()
-	l.program.Wait()
+	l.closeOnce.Do(func() {
+		close(l.done)
+		l.program.Quit()
+		l.program.Wait()
+	})
 	return nil
 }
 
