@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/lockfile"
+	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/logger"
 	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/pnpm"
 	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/store"
 )
@@ -152,6 +154,13 @@ func run(_ *cobra.Command, args []string) error {
 	expectedHash := hashFlag.GetString()
 	quiet := quietFlag.GetBool()
 
+	level := slog.LevelInfo
+	if quiet {
+		level = slog.LevelError
+	}
+	logger := logger.New(level)
+	defer logger.Close()
+
 	srcPath := args[0]
 	osFs := afero.NewOsFs()
 
@@ -159,24 +168,26 @@ func run(_ *cobra.Command, args []string) error {
 	lockfilePath := filepath.Join(srcPath, "pnpm-lock.yaml")
 	lf, loadErr := lockfile.Load(osFs, lockfilePath)
 	if loadErr != nil {
-		return loadErr
+		logger.Fatalf("failed to load pnpm-lock.yaml: %w", loadErr)
 	}
+	logger.Infof("loaded pnpm-lock.yaml from %s", lockfilePath)
 
 	// Create pnpm instance from explicit path or PATH env var
 	p, pnpmErr := initPnpm(osFs, pnpmPath)
 	if pnpmErr != nil {
-		return pnpmErr
+		logger.Fatalf("failed to initialize pnpm: %w", pnpmErr)
 	}
 
 	// Validate lockfile version against pnpm version
-	if verErr := validateLockfileVersion(lf, p); verErr != nil {
-		return verErr
+	verErr := validateLockfileVersion(lf, p)
+	if verErr != nil {
+		logger.Fatalf("invalid lockfile version: %w", verErr)
 	}
 
 	// Create temp directory for pnpm store
 	storePath, err := afero.TempDir(osFs, "", "nix-prefetch-pnpm-deps-")
 	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
+		logger.Fatalf("failed to create temp directory: %w", err)
 	}
 	defer func() { _ = osFs.RemoveAll(storePath) }()
 
@@ -189,25 +200,34 @@ func run(_ *cobra.Command, args []string) error {
 		PreInstallCommands: preInstallCommands,
 		WorkingDir:         srcPath,
 	}
-	installErr := p.Install(osFs, installOpts)
+	cmdLogger := logger.CommandLogger(slog.LevelInfo, "pnpm install")
+	installErr := p.Install(osFs, installOpts, cmdLogger)
 	if installErr != nil {
-		return installErr
+		logger.Fatalf("failed to install dependencies: %w", installErr)
 	}
 
 	// Normalize store and compute NAR hash
+	hashStepLogger := logger.StepLogger(slog.LevelInfo, "compute NAR hash")
 	hash, hashErr := computeStoreHash(osFs, storePath, fetcherVersion)
 	if hashErr != nil {
-		return hashErr
+		hashStepLogger.Fail(hashErr)
+		logger.Fatalf("failed to compute NAR hash: %w", hashErr)
 	}
+	hashStepLogger.Done()
 
 	// Verify against expected hash if provided
-	if expectedHash != "" && hash != expectedHash {
-		return fmt.Errorf("hash mismatch:\n  expected %s\n  got %s", expectedHash, hash)
+	if expectedHash != "" {
+		if expectedHash != hash {
+			logger.Fatalf("hash mismatch:\n  expected %s\n  got %s", expectedHash, hash)
+		}
+		return nil
 	}
 
-	if !quiet {
-		fmt.Fprintln(os.Stdout, hash)
-	}
+	// Close logger (stop TUI) before printing hash directly to stdout.
+	logger.Close()
+
+	// Print NAR hash
+	fmt.Fprintln(os.Stdout, hash)
 
 	return nil
 }
