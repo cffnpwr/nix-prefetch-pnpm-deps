@@ -2,11 +2,11 @@ package pnpm
 
 import (
 	"fmt"
+	"log/slog"
 	"os/exec"
 
 	"github.com/spf13/afero"
 
-	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/logger"
 	pnpm_err "github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/pnpm/errors"
 )
 
@@ -23,8 +23,10 @@ type InstallOptions struct {
 // Install runs pnpm install with the specified options.
 // It configures pnpm settings and runs install with --force, --ignore-scripts, --frozen-lockfile.
 //
-//nolint:funlen // sequential steps (configure → pre-install commands → install) kept together for readability
-func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions, cmdLogger logger.CommandLogger) pnpm_err.PnpmErrorIF {
+//nolint:funlen,cyclop // sequential steps (configure → pre-install commands → install) kept together for readability
+func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
+	cmdLogger := p.logger.CommandLogger(slog.LevelInfo, "pnpm install")
+
 	// Disable manage-package-manager-versions first, from a temporary directory.
 	// If package.json contains a "packageManager" field, pnpm checks it on every command.
 	// Running this config set in the source directory would fail because pnpm tries to

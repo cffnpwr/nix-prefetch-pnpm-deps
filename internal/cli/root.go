@@ -36,13 +36,13 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-func initPnpm(osFs afero.Fs, pnpmPath string) (*pnpm.Pnpm, error) {
+func initPnpm(osFs afero.Fs, logger logger.Logger, pnpmPath string) (*pnpm.Pnpm, error) {
 	if pnpmPath != "" {
-		p, pnpmErr := pnpm.New(osFs, pnpmPath)
+		p, pnpmErr := pnpm.New(osFs, logger, pnpmPath)
 		return p, pnpmErr
 	}
 
-	p, pnpmErr := pnpm.WithPathEnvVar(osFs)
+	p, pnpmErr := pnpm.WithPathEnvVar(osFs, logger)
 	return p, pnpmErr
 }
 
@@ -68,7 +68,14 @@ func validateLockfileVersion(l *lockfile.Lockfile, p *pnpm.Pnpm) error {
 	return nil
 }
 
-func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (string, error) {
+func computeStoreHash(
+	osFs afero.Fs,
+	logger logger.Logger,
+	storePath string,
+	fetcherVersion int,
+) (string, error) {
+	logger.Debugf("use fetcher version %d", fetcherVersion)
+
 	// Write .fetcher-version to the store directory before Normalize,
 	// because Normalize sets dirs to 0o555 (read-only).
 	// For v3+, .fetcher-version is written to a separate output directory in computeHashWithTarball.
@@ -83,33 +90,45 @@ func computeStoreHash(osFs afero.Fs, storePath string, fetcherVersion int) (stri
 	}
 
 	// Normalize the pnpm store (remove tmp/projects, normalize JSON, set permissions)
-	if normalizeErr := store.Normalize(osFs, store.NormalizeOptions{
+	logger.Debug("normalize pnpm store for reproducible hashing")
+	normalizeErr := store.Normalize(osFs, store.NormalizeOptions{
 		StorePath:      storePath,
 		FetcherVersion: fetcherVersion,
-	}); normalizeErr != nil {
+	})
+	if normalizeErr != nil {
 		return "", normalizeErr
 	}
 
 	//nolint:mnd // fetcherVersion 3+ uses tarball-based output
 	if fetcherVersion >= 3 {
-		return computeHashWithTarball(osFs, storePath, fetcherVersion)
+		return computeHashWithTarball(osFs, logger, storePath, fetcherVersion)
 	}
 
+	logger.Debugf("compute hash of pnpm store at %s", storePath)
 	hash, hashErr := store.Hash(osFs, storePath)
 	if hashErr != nil {
 		return "", hashErr
 	}
 
+	logger.Debugf("computed hash: %s", hash)
 	return hash, nil
 }
 
-func computeHashWithTarball(osFs afero.Fs, storePath string, fetcherVersion int) (string, error) {
+func computeHashWithTarball(
+	osFs afero.Fs,
+	logger logger.Logger,
+	storePath string,
+	fetcherVersion int,
+) (string, error) {
+	logger.Debug("creating tarball of pnpm store for hashing")
+
 	// Create temporary output directory for .fetcher-version and tarball
 	outDir, err := afero.TempDir(osFs, "", "nix-prefetch-pnpm-out-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 	defer func() { _ = osFs.RemoveAll(outDir) }()
+	logger.Debugf("created temporary output directory at %s", outDir)
 
 	// Write .fetcher-version file
 	fetcherVersionPath := filepath.Join(outDir, ".fetcher-version")
@@ -130,6 +149,7 @@ func computeHashWithTarball(osFs afero.Fs, storePath string, fetcherVersion int)
 	if tarballErr := store.CreateTarball(osFs, storePath, tarballPath); tarballErr != nil {
 		return "", tarballErr
 	}
+	logger.Debugf("created tarball of pnpm store at %s", tarballPath)
 
 	// Hash the output directory (containing .fetcher-version and tarball)
 	hash, hashErr := store.Hash(osFs, outDir)
@@ -137,6 +157,7 @@ func computeHashWithTarball(osFs afero.Fs, storePath string, fetcherVersion int)
 		return "", hashErr
 	}
 
+	logger.Debugf("computed hash with tarball: %s", hash)
 	return hash, nil
 }
 
@@ -161,6 +182,13 @@ func run(_ *cobra.Command, args []string) error {
 	logger := logger.New(level)
 	defer logger.Close()
 
+	logger.Debugf("fetcher version: %d", fetcherVersion)
+	logger.Debugf("pnpm path: %s", pnpmPath)
+	logger.Debugf("workspaces: %v", workspaces)
+	logger.Debugf("extra pnpm flags: %v", pnpmFlags)
+	logger.Debugf("pre-install commands: %v", preInstallCommands)
+	logger.Debugf("expected hash: %s", expectedHash)
+
 	srcPath := args[0]
 	osFs := afero.NewOsFs()
 
@@ -173,16 +201,22 @@ func run(_ *cobra.Command, args []string) error {
 	logger.Infof("loaded pnpm-lock.yaml from %s", lockfilePath)
 
 	// Create pnpm instance from explicit path or PATH env var
-	p, pnpmErr := initPnpm(osFs, pnpmPath)
+	p, pnpmErr := initPnpm(osFs, logger, pnpmPath)
 	if pnpmErr != nil {
 		logger.Fatalf("failed to initialize pnpm: %w", pnpmErr)
 	}
+	logger.Debugf("initialized pnpm with path: %s", p.Path())
 
 	// Validate lockfile version against pnpm version
 	verErr := validateLockfileVersion(lf, p)
 	if verErr != nil {
 		logger.Fatalf("invalid lockfile version: %w", verErr)
 	}
+	logger.Debugf(
+		"validated lockfile version %s is compatible with pnpm version %s",
+		lf.LockfileVersion,
+		func() string { v, _ := p.Version(); return v }(),
+	)
 
 	// Create temp directory for pnpm store
 	storePath, err := afero.TempDir(osFs, "", "nix-prefetch-pnpm-deps-")
@@ -190,6 +224,7 @@ func run(_ *cobra.Command, args []string) error {
 		logger.Fatalf("failed to create temp directory: %w", err)
 	}
 	defer func() { _ = osFs.RemoveAll(storePath) }()
+	logger.Debugf("created temporary directory for pnpm store at %s", storePath)
 
 	// Run pnpm install to fetch dependencies into the store
 	installOpts := pnpm.InstallOptions{
@@ -200,15 +235,15 @@ func run(_ *cobra.Command, args []string) error {
 		PreInstallCommands: preInstallCommands,
 		WorkingDir:         srcPath,
 	}
-	cmdLogger := logger.CommandLogger(slog.LevelInfo, "pnpm install")
-	installErr := p.Install(osFs, installOpts, cmdLogger)
+	installErr := p.Install(osFs, installOpts)
 	if installErr != nil {
 		logger.Fatalf("failed to install dependencies: %w", installErr)
 	}
+	logger.Infof("successfully installed dependencies to pnpm store at %s", storePath)
 
 	// Normalize store and compute NAR hash
 	hashStepLogger := logger.StepLogger(slog.LevelInfo, "compute NAR hash")
-	hash, hashErr := computeStoreHash(osFs, storePath, fetcherVersion)
+	hash, hashErr := computeStoreHash(osFs, logger, storePath, fetcherVersion)
 	if hashErr != nil {
 		hashStepLogger.Fail(hashErr)
 		logger.Fatalf("failed to compute NAR hash: %w", hashErr)
