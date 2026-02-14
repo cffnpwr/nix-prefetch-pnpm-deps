@@ -1,8 +1,9 @@
 package pnpm
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"log/slog"
 	"os/exec"
 
 	"github.com/spf13/afero"
@@ -23,8 +24,10 @@ type InstallOptions struct {
 // Install runs pnpm install with the specified options.
 // It configures pnpm settings and runs install with --force, --ignore-scripts, --frozen-lockfile.
 //
-//nolint:funlen // sequential steps (configure → pre-install commands → install) kept together for readability
+//nolint:funlen,cyclop // sequential steps (configure → pre-install commands → install) kept together for readability
 func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
+	cmdLogger := p.logger.CommandLogger(slog.LevelInfo, "pnpm install")
+
 	// Disable manage-package-manager-versions first, from a temporary directory.
 	// If package.json contains a "packageManager" field, pnpm checks it on every command.
 	// Running this config set in the source directory would fail because pnpm tries to
@@ -61,8 +64,8 @@ func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
 	for _, command := range opts.PreInstallCommands {
 		cmd := exec.Command("sh", "-c", command)
 		cmd.Dir = opts.WorkingDir
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		cmd.Stdout = cmdLogger
+		cmd.Stderr = cmdLogger
 
 		err := cmd.Run()
 		if err != nil {
@@ -98,16 +101,25 @@ func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
 	// Run pnpm install
 	cmd := exec.Command(p.path, args...)
 	cmd.Dir = opts.WorkingDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = cmdLogger
+	cmd.Stderr = cmdLogger
 
 	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			cmdLogger.Fail(exitErr.ExitCode())
+		} else {
+			cmdLogger.Fail(-1)
+		}
+
 		return pnpm_err.NewPnpmError(
 			&pnpm_err.FailedToExecuteError{},
 			"failed to execute pnpm install",
 			err,
 		)
 	}
+
+	cmdLogger.Done()
 
 	return nil
 }

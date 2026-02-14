@@ -1,12 +1,14 @@
 package pnpm
 
 import (
+	"log/slog"
 	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/afero"
 
+	"github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/logger"
 	pnpm_err "github.com/cffnpwr/nix-prefetch-pnpm-deps/internal/pnpm/errors"
 )
 
@@ -49,7 +51,10 @@ func Test_New(t *testing.T) {
 			t.Parallel()
 			fs := tt.setupFs()
 
-			got, gotErr := New(fs, tt.path)
+			l := logger.New(slog.LevelError)
+			t.Cleanup(func() { l.Close() })
+
+			got, gotErr := New(fs, l, tt.path)
 			if got != nil {
 				if d := cmp.Diff(tt.wantPath, got.path); d != "" {
 					t.Errorf("New() path mismatch (-want +got):\n%s", d)
@@ -109,7 +114,10 @@ func Test_WithPathEnvVar(t *testing.T) {
 			t.Setenv("PATH", tt.pathEnvVar)
 			fs := tt.setupFs()
 
-			got, gotErr := WithPathEnvVar(fs)
+			l := logger.New(slog.LevelError)
+			t.Cleanup(func() { l.Close() })
+
+			got, gotErr := WithPathEnvVar(fs, l)
 			if got != nil {
 				if d := cmp.Diff(tt.wantPath, got.path); d != "" {
 					t.Errorf("WithPathEnvVar() mismatch (-want +got):\n%s", d)
