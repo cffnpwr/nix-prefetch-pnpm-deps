@@ -12,7 +12,7 @@ type tuiCommandLogger struct {
 	start  time.Time
 }
 
-func (c *tuiCommandLogger) Write(p []byte) (n int, err error) {
+func (c *tuiCommandLogger) Write(p []byte) (int, error) {
 	for line := range strings.SplitSeq(strings.TrimRight(string(p), "\n"), "\n") {
 		c.logger.send(cmdLineMsg{line: line})
 	}

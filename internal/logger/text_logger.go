@@ -76,8 +76,8 @@ func (l *textLogger) Close() error {
 	return nil
 }
 
-func (l *textLogger) log(level LogLevel, msg string, args ...any) {
-	l.logger.Log(context.TODO(), level, msg, args...)
+func (l *textLogger) log(level LogLevel, msg string) {
+	l.logger.Log(context.TODO(), level, msg)
 }
 
 // textStepLogger implements StepLogger for text mode.
@@ -107,7 +107,7 @@ type textCommandLogger struct {
 	start        time.Time
 }
 
-func (c *textCommandLogger) Write(p []byte) (n int, err error) {
+func (c *textCommandLogger) Write(p []byte) (int, error) {
 	for line := range strings.SplitSeq(strings.Trim(string(p), "\n"), "\n") {
 		c.scopedLogger.Info(line)
 	}
@@ -154,8 +154,10 @@ func (c *textCommandLogger) writeFoldStart() {
 		fmt.Fprintf(c.logger.w, "--- %s\n", c.name)
 	case travisCI:
 		fmt.Fprintf(c.logger.w, "travis_fold:start:%s\n%s\n", c.foldID(), c.name)
+	case others:
+		c.logger.log(c.logLevel, "start "+c.name)
 	default:
-		c.logger.log(c.logLevel, fmt.Sprintf("start %s", c.name))
+		c.logger.log(c.logLevel, "start "+c.name)
 	}
 }
 
@@ -177,5 +179,6 @@ func (c *textCommandLogger) writeFoldEnd() {
 		fmt.Fprintf(c.logger.w, "##teamcity[blockClosed name='%s']\n", c.name)
 	case travisCI:
 		fmt.Fprintf(c.logger.w, "travis_fold:end:%s\n", c.foldID())
+	case buildkite, others:
 	}
 }

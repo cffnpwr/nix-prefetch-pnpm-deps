@@ -64,7 +64,7 @@ func Test_tuiModel_Update_setActive(t *testing.T) {
 	}{
 		{
 			name:  "[正常系] stepStartMsgでactiveEntryが設定される",
-			setup: func() tuiModel { return newTUIModel() },
+			setup: newTUIModel,
 			msg:   stepStartMsg{msg: "loading lockfile"},
 			assert: func(t *testing.T, m tuiModel) {
 				t.Helper()
@@ -81,7 +81,7 @@ func Test_tuiModel_Update_setActive(t *testing.T) {
 		},
 		{
 			name:  "[正常系] cmdStartMsgでコマンド用のactiveEntryが設定される",
-			setup: func() tuiModel { return newTUIModel() },
+			setup: newTUIModel,
 			msg:   cmdStartMsg{name: "pnpm install"},
 			assert: func(t *testing.T, m tuiModel) {
 				t.Helper()
@@ -166,7 +166,7 @@ func Test_tuiModel_Update_completeLine(t *testing.T) {
 	}{
 		{
 			name:         "[正常系] logLineMsgでログ行がlinesに追加される",
-			setup:        func() tuiModel { return newTUIModel() },
+			setup:        newTUIModel,
 			msg:          logLineMsg{line: "hello world"},
 			wantContains: []string{"hello world"},
 		},
@@ -315,7 +315,7 @@ func Test_tuiModel_Update_interruptMsg(t *testing.T) {
 	}{
 		{
 			name:       "[正常系] activeがnilのときinterruptMsgでquittingが設定される",
-			setup:      func() tuiModel { return newTUIModel() },
+			setup:      newTUIModel,
 			wantLines:  1,
 			wantActive: false,
 		},

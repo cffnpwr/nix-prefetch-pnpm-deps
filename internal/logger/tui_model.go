@@ -28,13 +28,21 @@ type (
 	interruptMsg struct{}
 )
 
+const cmdBoxMarginLeft = 2
+
 var (
 	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 
-	doneStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	warnStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	failStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	pipeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	doneStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	warnStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	failStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	cmdBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("8")).
+			PaddingLeft(1).
+			MarginLeft(cmdBoxMarginLeft)
+
+	overflowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )
 
 // tuiModel is the Bubble Tea model.
@@ -132,17 +140,16 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case cmdFailMsg:
 		if m.active != nil {
-			lines := []string{
-				failStyle.Render("✖") +
-					fmt.Sprintf(
-						" `%s` failed with exit code %d in %s",
-						m.active.msg, msg.exitCode, msg.elapsed,
-					),
+			header := failStyle.Render("✖") +
+				fmt.Sprintf(
+					" `%s` failed with exit code %d in %s",
+					m.active.msg, msg.exitCode, msg.elapsed,
+				)
+			if len(m.active.ringBuf) > 0 {
+				cmdOutput := strings.Join(m.active.ringBuf, "\n")
+				header += "\n" + cmdBoxStyle.Render(cmdOutput)
 			}
-			for _, l := range m.active.ringBuf {
-				lines = append(lines, "  | "+l)
-			}
-			m.lines = append(m.lines, strings.Join(lines, "\n"))
+			m.lines = append(m.lines, header)
 			m.active = nil
 		}
 		return m, nil
@@ -168,28 +175,31 @@ func (m tuiModel) View() string {
 		b.WriteByte('\n')
 	}
 
-	if m.active != nil {
-		b.WriteString(m.spinner.View())
-		b.WriteByte(' ')
-		if m.active.isCommand {
-			fmt.Fprintf(&b, "Executing `%s` ...", m.active.msg)
-			b.WriteByte('\n')
-			for _, l := range m.active.ringBuf {
-				b.WriteString(pipeStyle.Render("  | "))
-				b.WriteString(l)
-				b.WriteByte('\n')
-			}
-			overflow := m.active.totalLines - len(m.active.ringBuf)
-			if overflow > 0 {
-				fmt.Fprintf(&b, pipeStyle.Render("  + (+%d lines)"), overflow)
-				b.WriteByte('\n')
-			}
-		} else {
-			b.WriteString(m.active.msg)
-			b.WriteByte('\n')
-		}
+	if m.active == nil {
+		return b.String()
 	}
 
+	b.WriteString(m.spinner.View())
+	b.WriteByte(' ')
+	if m.active.isCommand {
+		fmt.Fprintf(&b, "Executing `%s` ...", m.active.msg)
+		b.WriteByte('\n')
+		cmdLines := append([]string{}, m.active.ringBuf...)
+		overflow := m.active.totalLines - len(m.active.ringBuf)
+		if overflow > 0 {
+			cmdLines = append(
+				cmdLines,
+				overflowStyle.Render(fmt.Sprintf("(+%d lines)", overflow)),
+			)
+		}
+		if len(cmdLines) > 0 {
+			b.WriteString(cmdBoxStyle.Render(strings.Join(cmdLines, "\n")))
+			b.WriteByte('\n')
+		}
+	} else {
+		b.WriteString(m.active.msg)
+		b.WriteByte('\n')
+	}
 	return b.String()
 }
 

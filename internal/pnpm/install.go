@@ -1,6 +1,7 @@
 package pnpm
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -104,7 +105,8 @@ func (p *Pnpm) Install(fs afero.Fs, opts InstallOptions) pnpm_err.PnpmErrorIF {
 	cmd.Stderr = cmdLogger
 
 	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			cmdLogger.Fail(exitErr.ExitCode())
 		} else {
 			cmdLogger.Fail(-1)

@@ -259,7 +259,7 @@ func run(_ *cobra.Command, args []string) error {
 	}
 
 	// Close logger (stop TUI) before printing hash directly to stdout.
-	logger.Close()
+	_ = logger.Close()
 
 	// Print NAR hash
 	fmt.Fprintln(os.Stdout, hash)
