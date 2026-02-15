@@ -87,32 +87,32 @@ func (l *tuiLogger) Debugf(tmpl string, args ...any) {
 	if !l.enabled(slog.LevelDebug) {
 		return
 	}
-	l.send(logLineMsg{line: fmt.Sprintf(tmpl, args...)})
+	l.send(logLineMsg{line: fmt.Errorf(tmpl, args...).Error()})
 }
 
 func (l *tuiLogger) Infof(tmpl string, args ...any) {
 	if !l.enabled(slog.LevelInfo) {
 		return
 	}
-	l.send(logLineMsg{line: doneStyle.Render("✓") + " " + fmt.Sprintf(tmpl, args...)})
+	l.send(logLineMsg{line: doneStyle.Render("✓") + " " + fmt.Errorf(tmpl, args...).Error()})
 }
 
 func (l *tuiLogger) Warnf(tmpl string, args ...any) {
 	if !l.enabled(slog.LevelWarn) {
 		return
 	}
-	l.send(logLineMsg{line: warnStyle.Render("!") + " " + fmt.Sprintf(tmpl, args...)})
+	l.send(logLineMsg{line: warnStyle.Render("!") + " " + fmt.Errorf(tmpl, args...).Error()})
 }
 
 func (l *tuiLogger) Errorf(tmpl string, args ...any) {
 	if !l.enabled(slog.LevelError) {
 		return
 	}
-	l.send(logLineMsg{line: failStyle.Render("✖") + " " + fmt.Sprintf(tmpl, args...)})
+	l.send(logLineMsg{line: failStyle.Render("✖") + " " + fmt.Errorf(tmpl, args...).Error()})
 }
 
 func (l *tuiLogger) Fatalf(tmpl string, args ...any) {
-	l.send(logLineMsg{line: failStyle.Render("✖") + " " + fmt.Sprintf(tmpl, args...)})
+	l.send(logLineMsg{line: failStyle.Render("✖") + " " + fmt.Errorf(tmpl, args...).Error()})
 	_ = l.Close()
 	os.Exit(1)
 }
