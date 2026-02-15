@@ -45,7 +45,7 @@ type fdWriter interface {
 }
 
 func New(level LogLevel) Logger {
-	return newLogger(level, os.Stdout)
+	return newLogger(level, os.Stderr)
 }
 
 func newLogger(level LogLevel, w io.Writer) Logger {

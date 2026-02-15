@@ -37,13 +37,24 @@ func (l *textLogger) Fatal(msg string, args ...any) {
 	os.Exit(1)
 }
 
-func (l *textLogger) Debugf(tmpl string, args ...any) { l.logger.Debug(fmt.Sprintf(tmpl, args...)) }
-func (l *textLogger) Infof(tmpl string, args ...any)  { l.logger.Info(fmt.Sprintf(tmpl, args...)) }
-func (l *textLogger) Warnf(tmpl string, args ...any)  { l.logger.Warn(fmt.Sprintf(tmpl, args...)) }
-func (l *textLogger) Errorf(tmpl string, args ...any) { l.logger.Error(fmt.Sprintf(tmpl, args...)) }
+func (l *textLogger) Debugf(tmpl string, args ...any) {
+	l.logger.Debug(fmt.Errorf(tmpl, args...).Error())
+}
+
+func (l *textLogger) Infof(tmpl string, args ...any) {
+	l.logger.Info(fmt.Errorf(tmpl, args...).Error())
+}
+
+func (l *textLogger) Warnf(tmpl string, args ...any) {
+	l.logger.Warn(fmt.Errorf(tmpl, args...).Error())
+}
+
+func (l *textLogger) Errorf(tmpl string, args ...any) {
+	l.logger.Error(fmt.Errorf(tmpl, args...).Error())
+}
 
 func (l *textLogger) Fatalf(tmpl string, args ...any) {
-	l.logger.Error(fmt.Sprintf(tmpl, args...))
+	l.logger.Error(fmt.Errorf(tmpl, args...).Error())
 	os.Exit(1)
 }
 
