@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.1.1...v1.2.0) (2026-02-15)
+
+
+### Features
+
+* :sparkles: ログ出力の改善 ([#13](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/issues/13)) ([7ffdc3f](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/7ffdc3f5fc4e62034aafcc70f10441316f2c6e0f))
+
 ## [1.1.1](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.1.0...v1.1.1) (2026-02-10)
 
 
