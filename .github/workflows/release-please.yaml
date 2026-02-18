@@ -5,10 +5,7 @@ on:
       - main
 
 concurrency:
-  group: >-
-    ${{ github.workflow }}-
-    ${{ github.repository }}-
-    ${{ github.head_ref || github.run_id }}
+  group: "${{ github.workflow }}-${{ github.repository }}-${{ github.ref_name }}"
   cancel-in-progress: true
 
 permissions: {}
@@ -18,6 +15,13 @@ jobs:
     name: Release Please
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    outputs:
+      release_created: ${{ steps.release-please.outputs.release_created }}
+      tag_name: ${{ steps.release-please.outputs.tag_name }}
+      # release-please-action@v4 does not expose an `id` output.
+      # Pass upload_url and extract the release ID from it in the downstream job.
+      # upload_url format: https://uploads.github.com/repos/OWNER/REPO/releases/{id}/assets{?name,label}
+      upload_url: ${{ steps.release-please.outputs.upload_url }}
     steps:
       - name: Create GitHub App Token
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
@@ -32,8 +36,76 @@ jobs:
 
       - name: Release Please
         uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+        id: release-please
         with:
           token: ${{ steps.app-token.outputs.token }}
           target-branch: ${{ github.ref_name }}
           config-file: .github/release-please/config.json
           manifest-file: .github/release-please/manifest.json
+
+  merge-to-release:
+    name: Merge main to release branch and tag
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: "${{ github.workflow }}-${{ github.repository }}-merge-to-release"
+      cancel-in-progress: false
+    steps:
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PRIVATE_KEY }}
+          permission-metadata: read
+          permission-contents: write
+
+      - name: Checkout main branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Squash merge main into release branch
+        env:
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          git config user.name "cffnpwr-release-bot[bot]"
+          git config user.email "cffnpwr-release-bot[bot]@users.noreply.github.com"
+
+          # `git checkout release` depends on DWIM,
+          # so it is created by explicitly specifying the remote tracking branch.
+          git checkout -b release --track origin/release
+
+          # Squash merge main into release
+          git merge --squash main
+          git commit -m "chore(release): ${TAG_NAME}"
+
+          # Create tag on release branch
+          git tag "${TAG_NAME}"
+
+          # Push release branch and tag atomically.
+          git push --atomic origin release "${TAG_NAME}"
+
+      - name: Update draft GitHub release with tag
+        env:
+          UPLOAD_URL: ${{ needs.release-please.outputs.upload_url }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # Extract the release ID from upload_url.
+          # upload_url format: https://uploads.github.com/repos/OWNER/REPO/releases/{id}/assets{?name,label}
+          RELEASE_ID=$(echo "${UPLOAD_URL}" | grep -oP '(?<=releases/)\d+(?=/assets)')
+
+          # gh release edit only accepts <tag> and does not have a `--id` option,
+          # so to access untagged draft releases you need to use gh api directly.
+          # This must be done AFTER git push: once the tag exists, GitHub ignores
+          # target_commitish in the PATCH request, so there is no risk of it
+          # auto-creating a tag pointing at the wrong commit.
+          gh api \
+            --method PATCH \
+            /repos/${{ github.repository }}/releases/${RELEASE_ID} \
+            -f tag_name="${TAG_NAME}"

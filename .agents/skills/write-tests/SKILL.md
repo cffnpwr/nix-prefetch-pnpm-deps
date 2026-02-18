@@ -7,7 +7,7 @@ description: Workflow for writing tests in this Go project. Use when creating ne
 
 ## Reference
 
-Full pattern details: `.claude/docs/reference/testing.md`
+Full pattern details: `.agents/docs/reference/testing.md`
 
 ## Steps
 
