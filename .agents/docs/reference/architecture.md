@@ -23,7 +23,7 @@ CLI layer using cobra.
 
 Shared utilities:
 
-- `BaseError` — Base error struct with `Message`/`Cause`/`Unwrap`. See `.claude/docs/reference/error-handling.md` for full pattern.
+- `BaseError` — Base error struct with `Message`/`Cause`/`Unwrap`. See `.agents/docs/reference/error-handling.md` for full pattern.
 - `MajorVersion` — Semver parser that extracts major version number.
 
 ### `lockfile/`

@@ -54,7 +54,7 @@ return nil, &lockfile_err.LockfileNotFoundError{
 
 Each concrete error type lives in its own file under `errors/`. All implement the domain `ErrorIF` interface with `Error()`, `Is()`, `As()` methods and a compile-time check.
 
-→ Full pattern: `.claude/docs/reference/error-handling.md`
+→ Full pattern: `.agents/docs/reference/error-handling.md`
 
 ## Import Ordering
 

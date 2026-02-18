@@ -1,16 +1,18 @@
 name: Release
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - "v*"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.repository }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
 
 jobs:
   build:
-    if: startsWith(github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
       matrix:
@@ -21,14 +23,17 @@ jobs:
             nix-system: aarch64-linux
           - runner: macos-15
             nix-system: aarch64-darwin
+            # Note: DeterminateNix does not work on x86_64-darwin. Use aarch64-darwin with Rosetta 2.
           - runner: macos-15
             nix-system: x86_64-darwin
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
+      - name: Checkout release branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.release.target_commitish }}
+          ref: ${{ github.ref }}
 
       - name: Setup Nix
         uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
@@ -46,12 +51,16 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
+      - name: Checkout release branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.ref }}
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           pattern: dist-*
 
@@ -65,7 +74,7 @@ jobs:
 
       - name: Create release archives and upload
         run: |
-          TAG_NAME="${{ github.event.release.tag_name }}"
+          TAG_NAME="${{ github.ref_name }}"
           VERSION=${TAG_NAME#v}
 
           # Create archives from each platform's binary
@@ -90,8 +99,8 @@ jobs:
           # Generate checksums
           sha256sum *.tar.gz > checksums.txt
 
-          # Upload assets to the existing draft release and publish it
-          gh release upload "$TAG_NAME" *.tar.gz checksums.txt
+          # Upload assets to the draft release and publish it
+          gh release upload "$TAG_NAME" *.tar.gz checksums.txt --clobber
           gh release edit "$TAG_NAME" --draft=false
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

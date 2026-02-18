@@ -7,7 +7,7 @@ description: Workflow for implementing error types in this project's domain erro
 
 ## Reference
 
-Full pattern details: `.claude/docs/reference/error-handling.md`
+Full pattern details: `.agents/docs/reference/error-handling.md`
 
 ## Adding a New Error Type to an Existing Domain
 
