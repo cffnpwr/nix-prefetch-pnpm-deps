@@ -5,6 +5,12 @@
   "include-component-in-tag": false,
   "include-v-in-tag": true,
   "draft": true,
+  "extra-files": [
+    {
+      "type": "generic",
+      "path": "flake.nix"
+    }
+  ],
   "packages": {
     ".": {}
   }
