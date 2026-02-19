@@ -13,11 +13,11 @@
         { pkgs, src }:
         {
           pname = "nix-prefetch-pnpm-deps";
-          version = "1.0.0";
+          version = "1.2.1"; # x-release-please-version
 
           inherit src;
 
-          vendorHash = "sha256-yMIimiDH8J6iNTeTAAANT7frTBbgZm9o05Ga8VjdGgg=";
+          vendorHash = "sha256-bxpZkaT8yzFSKiBmSsLD+VtfxzNkQbyuG4v3KnWnAvs=";
 
           env.CGO_ENABLED = "1";
           nativeBuildInputs = [ pkgs.pkg-config ];
