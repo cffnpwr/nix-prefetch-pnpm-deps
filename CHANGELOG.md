@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.2.0...v1.2.1) (2026-02-19)
+
+
+### Bug Fixes
+
+* :bug: リリースワークフローが発火されない問題を修正 ([#19](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/issues/19)) ([46d3bae](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/46d3bae04eaba7bd1d2b3733006990a2c5123cea))
+
+
+### Reverts
+
+* :rewind: revert manifest to v1.2.0 ([#21](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/issues/21)) ([d01aa6e](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/d01aa6eb4887eb3fe65a2d8e766ca9ec2146e5a4))
+
 ## [1.2.1](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.2.0...v1.2.1) (2026-02-18)
 
 
