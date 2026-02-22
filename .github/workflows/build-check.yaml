@@ -1,0 +1,57 @@
+name: Build check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-go-mod-changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      go-mod-changed: ${{ steps.filter.outputs.go-mod }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Detect go.mod/go.sum changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            go-mod:
+              - 'go.mod'
+              - 'go.sum'
+
+  nix-build:
+    needs: detect-go-mod-changes
+    if: >-
+      needs.detect-go-mod-changes.outputs.go-mod-changed == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            nix-system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            nix-system: aarch64-linux
+          - runner: macos-15
+            nix-system: aarch64-darwin
+          - runner: macos-15
+            nix-system: x86_64-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Nix
+        uses: DeterminateSystems/determinate-nix-action@89ab342bd48ff7318caf8d39d6a330c7b1df8f2f # v3.15.2
+
+      - name: Build with Nix
+        run: nix build .#static --system ${{ matrix.nix-system }}
