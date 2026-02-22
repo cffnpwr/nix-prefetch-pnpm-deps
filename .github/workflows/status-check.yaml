@@ -1,0 +1,16 @@
+name: Status check
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+jobs:
+  status-check:
+    uses: cffnpwr/actions/.github/workflows/status-check.yaml@main
+    secrets: inherit
