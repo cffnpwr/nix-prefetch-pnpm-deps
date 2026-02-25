@@ -110,7 +110,6 @@ jobs:
 
       - name: Create release archives and upload
         run: |
-          TAG_NAME="${{ needs.release-please.outputs.tag_name }}"
           VERSION=${TAG_NAME#v}
 
           # Create archives from each platform's binary
@@ -133,10 +132,11 @@ jobs:
           done
 
           # Generate checksums
-          sha256sum *.tar.gz > checksums.txt
+          sha256sum ./*.tar.gz > checksums.txt
 
           # Upload assets to the existing draft release and publish it
-          gh release upload "$TAG_NAME" *.tar.gz checksums.txt
+          gh release upload "$TAG_NAME" ./*.tar.gz checksums.txt
           gh release edit "$TAG_NAME" --draft=false
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
