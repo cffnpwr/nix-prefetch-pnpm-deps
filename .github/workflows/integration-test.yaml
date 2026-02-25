@@ -10,8 +10,13 @@ concurrency:
   group: ${{ github.workflow_ref }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   integration-test:
+    permissions:
+      contents: read
+    timeout-minutes: 60
     if: >-
       github.event_name == 'push' ||
       contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
@@ -31,6 +36,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Nix
         uses: DeterminateSystems/determinate-nix-action@f9ebef276016dd519d188ee7b71879732418f8b9 # v3.16.0

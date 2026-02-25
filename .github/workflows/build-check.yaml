@@ -10,14 +10,21 @@ concurrency:
   group: ${{ github.workflow_ref }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   detect-go-mod-changes:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 5
     outputs:
       go-mod-changed: ${{ steps.filter.outputs.go-mod }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Detect go.mod/go.sum changes
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
@@ -33,6 +40,9 @@ jobs:
     if: >-
       needs.detect-go-mod-changes.outputs.go-mod-changed == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
+    permissions:
+      contents: read
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -49,6 +59,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Nix
         uses: DeterminateSystems/determinate-nix-action@f9ebef276016dd519d188ee7b71879732418f8b9 # v3.16.0
