@@ -46,6 +46,9 @@ jobs:
   build:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true' && startsWith(needs.release-please.outputs.tag_name, 'v')
+    permissions:
+      contents: read
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -64,6 +67,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ needs.release-please.outputs.sha }}
+          persist-credentials: false
 
       - name: Setup Nix
         uses: DeterminateSystems/determinate-nix-action@f9ebef276016dd519d188ee7b71879732418f8b9 # v3.16.0
@@ -82,10 +86,15 @@ jobs:
   release:
     needs: [release-please, build]
     if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: read
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -101,7 +110,6 @@ jobs:
 
       - name: Create release archives and upload
         run: |
-          TAG_NAME="${{ needs.release-please.outputs.tag_name }}"
           VERSION=${TAG_NAME#v}
 
           # Create archives from each platform's binary
@@ -124,10 +132,11 @@ jobs:
           done
 
           # Generate checksums
-          sha256sum *.tar.gz > checksums.txt
+          sha256sum ./*.tar.gz > checksums.txt
 
           # Upload assets to the existing draft release and publish it
-          gh release upload "$TAG_NAME" *.tar.gz checksums.txt
+          gh release upload "$TAG_NAME" ./*.tar.gz checksums.txt
           gh release edit "$TAG_NAME" --draft=false
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}

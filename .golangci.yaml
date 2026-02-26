@@ -138,6 +138,10 @@ linters:
       # revive var-naming: common package serves its purpose as shared utilities
       - text: 'avoid meaningless package names'
         linters: [ revive ]
+      # revive var-naming: internal/path is an internal package, no conflict with stdlib path package
+      - text: 'avoid package names that conflict with Go standard library package names'
+        path: 'internal/path/'
+        linters: [ revive ]
       - path: '_test\.go'
         linters:
           - bodyclose
