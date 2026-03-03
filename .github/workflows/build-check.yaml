@@ -77,7 +77,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          token: ${{ steps.app-token.outputs.token || github.token }}
 
       - name: Setup Nix
         uses: DeterminateSystems/determinate-nix-action@73327eb48f028efaaf5013656ba216ca3cdeca7b # v3.16.3
@@ -108,6 +107,7 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'renovate')
         env:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
           USER_ID: ${{ steps.get-user-id.outputs.user-id }}
         run: |
           git stash --include-untracked
@@ -121,7 +121,9 @@ jobs:
             git config user.email "${USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
             git add --update --ignore-removal .
             git commit -m "fix(nix): :package: fix Nix vendorHash mismatches"
+            git remote set-url origin "https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
             git push origin "$GITHUB_HEAD_REF"
+            git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
           fi
 
           git checkout -
