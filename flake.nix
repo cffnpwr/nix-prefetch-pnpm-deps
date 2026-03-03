@@ -18,6 +18,7 @@
           inherit src;
 
           vendorHash = "sha256-bxpZkaT8yzFSKiBmSsLD+VtfxzNkQbyuG4v3KnWnAvs=";
+          goSum = ./go.sum;
 
           env.CGO_ENABLED = "1";
           nativeBuildInputs = [ pkgs.pkg-config ];
