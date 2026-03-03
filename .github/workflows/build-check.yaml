@@ -49,39 +49,24 @@ jobs:
         include:
           - runner: ubuntu-24.04
             nix-system: x86_64-linux
+            fix-hashes: true
           - runner: ubuntu-24.04-arm
             nix-system: aarch64-linux
+            fix-hashes: false
           - runner: macos-15
             nix-system: aarch64-darwin
+            fix-hashes: false
           - runner: macos-15
             nix-system: x86_64-darwin
+            fix-hashes: false
     runs-on: ${{ matrix.runner }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Setup Nix
-        uses: DeterminateSystems/determinate-nix-action@73327eb48f028efaaf5013656ba216ca3cdeca7b # v3.16.3
-
-      - name: Build with Nix
-        run: nix build .#static --system ${{ matrix.nix-system }}
-
-  fix-hashes:
-    needs: nix-build
-    if: >-
-      failure() &&
-      needs.nix-build.result == 'failure' &&
-      github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.labels.*.name, 'renovate')
-    permissions:
-      contents: read
-    timeout-minutes: 30
-    runs-on: ubuntu-24.04
     steps:
       - name: Generate GitHub App token
         id: app-token
+        if: >-
+          matrix.fix-hashes &&
+          github.event_name == 'pull_request' &&
+          contains(github.event.pull_request.labels.*.name, 'renovate')
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
         with:
           app-id: ${{ vars.UPDATE_APP_ID }}
@@ -92,19 +77,35 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.app-token.outputs.token || github.token }}
 
       - name: Setup Nix
         uses: DeterminateSystems/determinate-nix-action@73327eb48f028efaaf5013656ba216ca3cdeca7b # v3.16.3
 
+      - name: Build with Nix
+        id: nix-build
+        run: nix build .#static --system ${{ matrix.nix-system }}
+
       - name: Get GitHub App User ID
         id: get-user-id
+        if: >-
+          failure() &&
+          steps.nix-build.outcome == 'failure' &&
+          matrix.fix-hashes &&
+          github.event_name == 'pull_request' &&
+          contains(github.event.pull_request.labels.*.name, 'renovate')
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: echo "user-id=$(gh api "/users/${APP_SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
 
       - name: Fix hash mismatches
+        if: >-
+          failure() &&
+          steps.nix-build.outcome == 'failure' &&
+          matrix.fix-hashes &&
+          github.event_name == 'pull_request' &&
+          contains(github.event.pull_request.labels.*.name, 'renovate')
         env:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           USER_ID: ${{ steps.get-user-id.outputs.user-id }}
