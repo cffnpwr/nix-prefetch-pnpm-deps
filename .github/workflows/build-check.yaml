@@ -71,6 +71,7 @@ jobs:
   fix-hashes:
     needs: nix-build
     if: >-
+      failure() &&
       needs.nix-build.result == 'failure' &&
       github.event_name == 'pull_request' &&
       contains(github.event.pull_request.labels.*.name, 'renovate')
