@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/aymanbagabas/go-pty v0.2.2
-	github.com/caarlos0/env/v11 v11.3.1
+	github.com/caarlos0/env/v11 v11.4.0
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
