@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.2.1...v1.2.2) (2026-03-05)
+
+
+### Bug Fixes
+
+* :bug: リリースワークフローの修正 ([#25](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/issues/25)) ([ae26f1e](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/ae26f1eb4cd491c65d14c3b53e29165125cc903c))
+* **deps:** :package: update module github.com/caarlos0/env/v11 to v11.4.0 ([#39](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/issues/39)) ([1f0f02b](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/commit/1f0f02bf5bfb88a27f90f7081317fd53535d7b5c))
+
 ## [1.2.1](https://github.com/cffnpwr/nix-prefetch-pnpm-deps/compare/v1.2.0...v1.2.1) (2026-02-19)
 
 
