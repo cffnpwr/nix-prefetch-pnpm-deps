@@ -7,7 +7,7 @@ require (
 	github.com/caarlos0/env/v11 v11.4.0
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/charmbracelet/lipgloss/v2 v2.0.0
 	github.com/google/go-cmp v0.7.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/nix-community/go-nix v0.0.0-20250101154619-4bdde671e0a1
