@@ -19,6 +19,6 @@ permissions: {}
 
 jobs:
   flake-check:
-    uses: cffnpwr/actions/.github/workflows/flake-check.yaml@7697aea4419bb4364a48b2d077199624ead433d4
+    uses: cffnpwr/actions/.github/workflows/flake-check.yaml@d09e1234a71be2ff954d851d1ead90a60e17bcfb
     permissions:
       contents: read
