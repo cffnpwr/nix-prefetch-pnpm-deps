@@ -4,6 +4,14 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    go-overlay = {
+      url = "github:purpleclay/go-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixpkgs-extras = {
+      url = "github:cffnpwr/nixpkgs-extras";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -55,21 +63,26 @@
 
       perSystem =
         {
-          config,
-          self',
-          inputs',
           pkgs,
           lib,
           system,
           ...
         }:
         let
+          miseConfig = fromTOML (builtins.readFile ./mise.toml);
           commonPackageAttrs = mkCommonPackageAttrs {
             inherit pkgs;
             src = lib.cleanSource ./.;
           };
         in
         {
+          _module.args.pkgs = import inputs.nixpkgs {
+            inherit system;
+            overlays = [
+              inputs.go-overlay.overlays.default
+              inputs.nixpkgs-extras.overlays.default
+            ];
+          };
           packages = {
             default = pkgs.buildGoModule (
               commonPackageAttrs
@@ -99,28 +112,34 @@
           devShells.default = pkgs.mkShell {
             env.CGO_ENABLED = "1";
 
-            buildInputs = with pkgs; [
-              # development tools
-              git
-              lefthook
-              gopls
+            buildInputs =
+              let
+                go = pkgs.go-bin.versions.${miseConfig.tools.go};
+                golangci-lint = go.tools.golangci-lint.${miseConfig.tools.golangci-lint};
+                lefthook = pkgs.lefthook.passthru.versions.${miseConfig.tools.lefthook};
+              in
+              [
+                # development tools
+                pkgs.git
+                lefthook
+                pkgs.gopls
 
-              # linter/formatter
-              golangci-lint
-              nil
-              nixd
-              nixfmt
-              treefmt
+                # linter/formatter
+                golangci-lint
+                pkgs.nil
+                pkgs.nixd
+                pkgs.nixfmt
+                pkgs.treefmt
 
-              # build tools/dependencies
-              go
-              pkg-config
-              zstd
+                # build tools/dependencies
+                go
+                pkgs.pkg-config
+                pkgs.zstd
 
-              # for operation check
-              pnpm_10
-              nodejs_24
-            ];
+                # for operation check
+                pkgs.pnpm_10
+                pkgs.nodejs_24
+              ];
 
             shellHook = ''
               lefthook install
