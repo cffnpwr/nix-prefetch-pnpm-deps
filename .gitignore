@@ -1,3 +1,6 @@
 nix-prefetch-pnpm-deps
 dist/
 result/
+
+# direnv directory
+.direnv/
