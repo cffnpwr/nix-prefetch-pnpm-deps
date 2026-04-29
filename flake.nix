@@ -25,7 +25,7 @@
 
           inherit src;
 
-          vendorHash = "sha256-giQxJJbi4CnxiG9PbUVe/0znP+KPGCltlEWs4t9N66A=";
+          vendorHash = "sha256-eEjg6PrahgsfCh1iUEPoGtZy1KRYTv6Ssb3HsWZFoXA=";
           goSum = ./go.sum;
 
           env.CGO_ENABLED = "1";
