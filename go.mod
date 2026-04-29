@@ -1,6 +1,6 @@
 module github.com/cffnpwr/nix-prefetch-pnpm-deps
 
-go 1.25.5
+go 1.26.2
 
 require (
 	github.com/aymanbagabas/go-pty v0.2.2
